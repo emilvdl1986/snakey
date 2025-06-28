@@ -409,20 +409,60 @@ class _GameCanvasState extends State<GameCanvas> {
               }).toList(),
             // Draw snake on the grid
             if (snakePositions.isNotEmpty)
-              ...snakePositions.map((pos) {
-                final int col = pos['col']!;
-                final int row = pos['row']!;
+              ...snakePositions.asMap().entries.map((entry) {
+                final int idx = entry.key;
+                final int col = entry.value['col']!;
+                final int row = entry.value['row']!;
+                final bool isHead = idx == 0;
+                final bool isTail = idx == snakePositions.length - 1;
+                // Tail is 70%, rest is 90%
+                final double size = isTail ? cellSize * 0.7 : cellSize * 0.9;
+                final double offset = (cellSize - size) / 2;
                 return Positioned(
-                  left: col * cellSize,
-                  top: row * cellSize,
-                  width: cellSize,
-                  height: cellSize,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      border: Border.all(color: Colors.black, width: 2),
-                      shape: BoxShape.rectangle,
-                    ),
+                  left: col * cellSize + offset,
+                  top: row * cellSize + offset,
+                  width: size,
+                  height: size,
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          border: Border.all(color: Colors.black, width: 2),
+                          borderRadius: BorderRadius.circular(size * 0.3),
+                        ),
+                      ),
+                      if (isHead)
+                        // Draw two evenly positioned black eyes on the head
+                        Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: EdgeInsets.only(top: size * 0.18),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: size * 0.18,
+                                  height: size * 0.18,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                SizedBox(width: size * 0.18),
+                                Container(
+                                  width: size * 0.18,
+                                  height: size * 0.18,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 );
               }).toList(),

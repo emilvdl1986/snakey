@@ -15,6 +15,7 @@
     },
     "snakeSettings":{
         "initialLength":3,
-        "color":"green"
+        "color":"green",
+        "speed":1
     }
 }
