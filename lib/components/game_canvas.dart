@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -30,7 +31,7 @@ class GameCanvas extends StatefulWidget {
   State<GameCanvas> createState() => _GameCanvasState();
 }
 
-class _GameCanvasState extends State<GameCanvas> {
+class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMixin {
   List<dynamic>? objects;
   bool isLoadingObjects = true;
   List<Map<String, dynamic>> foodItems = [];
@@ -43,20 +44,64 @@ class _GameCanvasState extends State<GameCanvas> {
   SnakeDirection snakeDirection = SnakeDirection.right;
 
   bool _showCountdown = true;
+  Timer? _snakeTimer;
+
+  AnimationController? _moveController;
+  Animation<double>? _moveAnimation;
+  Offset? _oldHeadOffset;
+  Offset? _newHeadOffset;
+  bool _isAnimating = false;
+  int _pendingMoves = 0;
 
   @override
   void initState() {
     super.initState();
+    // Set random initial direction
+    final directions = SnakeDirection.values;
+    snakeDirection = directions[Random().nextInt(directions.length)];
+    _moveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _moveAnimation = CurvedAnimation(
+      parent: _moveController!,
+      curve: Curves.linear,
+    );
+    _moveAnimation!.addListener(() {
+      setState(() {});
+    });
+    _moveController!.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _isAnimating = false;
+        _moveController!.reset();
+        // Insert new head
+        if (_pendingNewHead != null) {
+          snakePositions.insert(0, _pendingNewHead!);
+          snakePositions.removeLast();
+          _pendingNewHead = null;
+        }
+        setState(() {});
+        _snakeMoving();
+      }
+    });
     _loadObjects();
   }
 
+  Map<String, int>? _pendingNewHead;
+
   void _loadSnake() {
-    // Parse snake settings from gridItemOptions or snakeSettings
-    snakeSettings = getSnakeSettings(widget.gridItemOptions);
+    // Use snakeSettings from widget.gridItemOptions or from widget if available
+    if (widget.gridItemOptions != null && widget.gridItemOptions!.containsKey('snakeSettings')) {
+      snakeSettings = widget.gridItemOptions!['snakeSettings'] as Map<String, dynamic>?;
+    } else if (widget.mode == 'story' && objects != null && objects is Map<String, dynamic> && (objects as Map<String, dynamic>).containsKey('snakeSettings')) {
+      snakeSettings = (objects as Map<String, dynamic>)['snakeSettings'] as Map<String, dynamic>?;
+    }
+    // fallback to previous logic if above fails
+    snakeSettings ??= getSnakeSettings(widget.gridItemOptions);
     // Place the snake on the grid in available positions based on snake length
     int snakeLength = 3; // default
-    if (snakeSettings != null && snakeSettings!['length'] is int) {
-      snakeLength = snakeSettings!['length'];
+    if (snakeSettings != null && (snakeSettings!['initialLength'] ?? snakeSettings!['length']) is int) {
+      snakeLength = snakeSettings!['initialLength'] ?? snakeSettings!['length'];
     }
     // Collect all occupied positions
     final Set<String> occupied = {};
@@ -85,7 +130,34 @@ class _GameCanvasState extends State<GameCanvas> {
           }
           segment.add({'col': col + i, 'row': row});
         }
-        if (canPlace) possiblePositions.add(segment);
+        if (canPlace) {
+          // Check head can move at least 2 blocks
+          final head = segment[0];
+          int freeMoves = 0;
+          // Check all four directions
+          for (var dir in [
+            {'dx': 1, 'dy': 0},
+            {'dx': -1, 'dy': 0},
+            {'dx': 0, 'dy': 1},
+            {'dx': 0, 'dy': -1},
+          ]) {
+            int nx = head['col']! + dir['dx']!;
+            int ny = head['row']! + dir['dy']!;
+            int nnx = nx + dir['dx']!;
+            int nny = ny + dir['dy']!;
+            String nKey = '$nx-$ny';
+            String nnKey = '$nnx-$nny';
+            if (nx >= 0 && nx < widget.columns && ny >= 0 && ny < widget.rows &&
+                !occupied.contains(nKey) &&
+                nnx >= 0 && nnx < widget.columns && nny >= 0 && nny < widget.rows &&
+                !occupied.contains(nnKey)) {
+              freeMoves++;
+            }
+          }
+          if (freeMoves > 0) {
+            possiblePositions.add(segment);
+          }
+        }
       }
     }
     // Vertical
@@ -101,11 +173,59 @@ class _GameCanvasState extends State<GameCanvas> {
           }
           segment.add({'col': col, 'row': row + i});
         }
-        if (canPlace) possiblePositions.add(segment);
+        if (canPlace) {
+          // Check head can move at least 2 blocks
+          final head = segment[0];
+          int freeMoves = 0;
+          for (var dir in [
+            {'dx': 1, 'dy': 0},
+            {'dx': -1, 'dy': 0},
+            {'dx': 0, 'dy': 1},
+            {'dx': 0, 'dy': -1},
+          ]) {
+            int nx = head['col']! + dir['dx']!;
+            int ny = head['row']! + dir['dy']!;
+            int nnx = nx + dir['dx']!;
+            int nny = ny + dir['dy']!;
+            String nKey = '$nx-$ny';
+            String nnKey = '$nnx-$nny';
+            if (nx >= 0 && nx < widget.columns && ny >= 0 && ny < widget.rows &&
+                !occupied.contains(nKey) &&
+                nnx >= 0 && nnx < widget.columns && nny >= 0 && nny < widget.rows &&
+                !occupied.contains(nnKey)) {
+              freeMoves++;
+            }
+          }
+          if (freeMoves > 0) {
+            possiblePositions.add(segment);
+          }
+        }
       }
     }
     if (possiblePositions.isNotEmpty) {
       snakePositions = possiblePositions[random.nextInt(possiblePositions.length)];
+      // Set the initial direction to be opposite of the second block
+      if (snakePositions.length > 1) {
+        final head = snakePositions[0];
+        final second = snakePositions[1];
+        final int headCol = head['col'] ?? 0;
+        final int headRow = head['row'] ?? 0;
+        final int secondCol = second['col'] ?? 0;
+        final int secondRow = second['row'] ?? 0;
+        if (headCol == secondCol) {
+          if (headRow == secondRow - 1) {
+            snakeDirection = SnakeDirection.up;
+          } else if (headRow == secondRow + 1) {
+            snakeDirection = SnakeDirection.down;
+          }
+        } else if (headRow == secondRow) {
+          if (headCol == secondCol - 1) {
+            snakeDirection = SnakeDirection.left;
+          } else if (headCol == secondCol + 1) {
+            snakeDirection = SnakeDirection.right;
+          }
+        }
+      }
     } else {
       snakePositions = [];
     }
@@ -303,11 +423,14 @@ class _GameCanvasState extends State<GameCanvas> {
 
   // Moves the snake one step in the current direction
   void _snakeMoving() {
-    if (snakePositions.isEmpty) return;
-    // Get current head
+    if (_isAnimating || snakePositions.isEmpty) return;
     final head = snakePositions.first;
     int newCol = head['col']!;
     int newRow = head['row']!;
+    final int maxCol = widget.columns - 1;
+    final int maxRow = widget.rows - 1;
+    final bool canGoThroughBorders = (snakeSettings?['canGoThroughBorders'] ?? snakeSettings?['canGoTroughBorders'] ?? false) == true;
+
     switch (snakeDirection) {
       case SnakeDirection.up:
         newRow -= 1;
@@ -322,17 +445,57 @@ class _GameCanvasState extends State<GameCanvas> {
         newCol += 1;
         break;
     }
-    // Insert new head
-    snakePositions.insert(0, {'col': newCol, 'row': newRow});
-    // Remove tail
-    snakePositions.removeLast();
-    setState(() {});
+
+    if (canGoThroughBorders) {
+      if (newCol < 0) newCol = maxCol;
+      if (newCol > maxCol) newCol = 0;
+      if (newRow < 0) newRow = maxRow;
+      if (newRow > maxRow) newRow = 0;
+    } else {
+      if (newCol < 0 || newCol > maxCol || newRow < 0 || newRow > maxRow) {
+        return;
+      }
+    }
+
+    for (final segment in snakePositions) {
+      if (segment['col'] == newCol && segment['row'] == newRow) {
+        return;
+      }
+    }
+
+    // Animate all segments
+    List<Offset> oldOffsets = snakePositions.map((s) => Offset(s['col']!.toDouble(), s['row']!.toDouble())).toList();
+    List<Offset> newOffsets = [Offset(newCol.toDouble(), newRow.toDouble())];
+    newOffsets.addAll(oldOffsets.take(oldOffsets.length - 1));
+    _isAnimating = true;
+    _oldHeadOffset = oldOffsets[0];
+    _newHeadOffset = newOffsets[0];
+    _segmentOldOffsets = oldOffsets;
+    _segmentNewOffsets = newOffsets;
+    _pendingNewHead = {'col': newCol, 'row': newRow};
+    _moveController!.forward(from: 0);
+  }
+
+  List<Offset>? _segmentOldOffsets;
+  List<Offset>? _segmentNewOffsets;
+
+  void _startSnakeMoving() {
+    // Only trigger the first move after countdown, then let animation drive the loop
+    _snakeMoving();
+  }
+
+  @override
+  void dispose() {
+    _snakeTimer?.cancel();
+    _moveController?.dispose();
+    super.dispose();
   }
 
   void _onCountdownFinished() {
     setState(() {
       _showCountdown = false;
     });
+    _startSnakeMoving();
   }
 
   @override
@@ -463,9 +626,19 @@ class _GameCanvasState extends State<GameCanvas> {
                 final bool isTail = idx == snakePositions.length - 1;
                 final double size = isTail ? cellSize * 0.7 : cellSize * 0.9;
                 final double offset = (cellSize - size) / 2;
+                double left = col * cellSize + offset;
+                double top = row * cellSize + offset;
+                if (_isAnimating && _segmentOldOffsets != null && _segmentNewOffsets != null && idx < _segmentOldOffsets!.length) {
+                  final old = _segmentOldOffsets![idx];
+                  final newO = _segmentNewOffsets![idx];
+                  final dx = old.dx + (newO.dx - old.dx) * (_moveAnimation?.value ?? 0);
+                  final dy = old.dy + (newO.dy - old.dy) * (_moveAnimation?.value ?? 0);
+                  left = dx * cellSize + offset;
+                  top = dy * cellSize + offset;
+                }
                 return Positioned(
-                  left: col * cellSize + offset,
-                  top: row * cellSize + offset,
+                  left: left,
+                  top: top,
                   width: size,
                   height: size,
                   child: Stack(

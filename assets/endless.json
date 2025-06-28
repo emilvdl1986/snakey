@@ -22,6 +22,8 @@
     "snakeSettings":{
         "initialLength":3,
         "color":"green",
-         "speed":1
+        "speed":1,
+        "canGoThroughBorders":true
+       
     }
 }
