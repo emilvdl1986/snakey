@@ -31,6 +31,7 @@ class _GameCanvasState extends State<GameCanvas> {
   List<dynamic>? objects;
   bool isLoadingObjects = true;
   List<Map<String, dynamic>> foodItems = [];
+  List<Map<String, dynamic>> dangerItems = [];
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class _GameCanvasState extends State<GameCanvas> {
         isLoadingObjects = false;
       });
       _generateRandomFoodItems();
+      _generateRandomDangerItems();
     } catch (e) {
       setState(() {
         objects = null;
@@ -87,6 +89,48 @@ class _GameCanvasState extends State<GameCanvas> {
       final foodObj = foodObjects[random.nextInt(foodObjects.length)];
       foodItems.add({
         'object': foodObj,
+        'col': col,
+        'row': row,
+      });
+    }
+    setState(() {});
+  }
+
+  /// Generates random danger items and places them on unoccupied grid positions.
+  /// Returns a list of maps with danger object and its position.
+  void _generateRandomDangerItems({List<List<int>>? occupied}) {
+    if (objects == null || widget.gridItemOptions == null) return;
+    final int dangerLimit = widget.gridItemOptions?['dangerItemsLimit'] ?? 1;
+    final List<Map<String, int>> occupiedPositions = [];
+    if (occupied != null) {
+      for (var pos in occupied) {
+        occupiedPositions.add({'col': pos[0], 'row': pos[1]});
+      }
+    }
+    // Add already used positions by food to occupied
+    for (var food in foodItems) {
+      occupiedPositions.add({'col': food['col'], 'row': food['row']});
+    }
+    final List<dynamic> dangerObjects = objects!.where((obj) => obj['type'] == 'danger').toList();
+    final Random random = Random();
+    final Set<String> usedPositions = {};
+    dangerItems.clear();
+    int count = dangerLimit > 0 ? random.nextInt(dangerLimit) + 1 : 1;
+    for (int i = 0; i < count; i++) {
+      int col, row;
+      String posKey;
+      do {
+        col = random.nextInt(widget.columns);
+        row = random.nextInt(widget.rows);
+        posKey = '$col-$row';
+      } while (
+        usedPositions.contains(posKey) ||
+        occupiedPositions.any((o) => o['col'] == col && o['row'] == row)
+      );
+      usedPositions.add(posKey);
+      final dangerObj = dangerObjects[random.nextInt(dangerObjects.length)];
+      dangerItems.add({
+        'object': dangerObj,
         'col': col,
         'row': row,
       });
@@ -186,6 +230,24 @@ class _GameCanvasState extends State<GameCanvas> {
                 final int col = food['col'];
                 final int row = food['row'];
                 final String? imagePath = food['object']['image'];
+                if (imagePath == null) return const SizedBox.shrink();
+                return Positioned(
+                  left: col * cellSize,
+                  top: row * cellSize,
+                  width: cellSize,
+                  height: cellSize,
+                  child: Image.asset(
+                    imagePath,
+                    fit: BoxFit.contain,
+                  ),
+                );
+              }).toList(),
+            // Draw danger items using their image
+            if (dangerItems.isNotEmpty)
+              ...dangerItems.map((danger) {
+                final int col = danger['col'];
+                final int row = danger['row'];
+                final String? imagePath = danger['object']['image'];
                 if (imagePath == null) return const SizedBox.shrink();
                 return Positioned(
                   left: col * cellSize,
