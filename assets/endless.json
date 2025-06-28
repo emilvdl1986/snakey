@@ -18,5 +18,9 @@
             "dangerItemsLimit":2,
             "exitItemsLimit":1
         }
+    },
+    "snakeSettings":{
+        "initialLength":3,
+        "color":"green"
     }
 }

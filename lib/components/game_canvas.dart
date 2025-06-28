@@ -34,10 +34,75 @@ class _GameCanvasState extends State<GameCanvas> {
   List<Map<String, dynamic>> dangerItems = [];
   List<Map<String, dynamic>> exitItems = [];
 
+  Map<String, dynamic>? snakeSettings;
+  List<Map<String, int>> snakePositions = [];
+
   @override
   void initState() {
     super.initState();
     _loadObjects();
+  }
+
+  void _loadSnake() {
+    // Parse snake settings from gridItemOptions or snakeSettings
+    snakeSettings = getSnakeSettings(widget.gridItemOptions);
+    // Place the snake on the grid in available positions based on snake length
+    int snakeLength = 3; // default
+    if (snakeSettings != null && snakeSettings!['length'] is int) {
+      snakeLength = snakeSettings!['length'];
+    }
+    // Collect all occupied positions
+    final Set<String> occupied = {};
+    for (var food in foodItems) {
+      occupied.add('${food['col']}-${food['row']}');
+    }
+    for (var danger in dangerItems) {
+      occupied.add('${danger['col']}-${danger['row']}');
+    }
+    for (var exit in exitItems) {
+      occupied.add('${exit['col']}-${exit['row']}');
+    }
+    // Try to find a horizontal or vertical segment of length snakeLength
+    final Random random = Random();
+    List<List<Map<String, int>>> possiblePositions = [];
+    // Horizontal
+    for (int row = 0; row < widget.rows; row++) {
+      for (int col = 0; col <= widget.columns - snakeLength; col++) {
+        bool canPlace = true;
+        List<Map<String, int>> segment = [];
+        for (int i = 0; i < snakeLength; i++) {
+          String posKey = '${col + i}-$row';
+          if (occupied.contains(posKey)) {
+            canPlace = false;
+            break;
+          }
+          segment.add({'col': col + i, 'row': row});
+        }
+        if (canPlace) possiblePositions.add(segment);
+      }
+    }
+    // Vertical
+    for (int col = 0; col < widget.columns; col++) {
+      for (int row = 0; row <= widget.rows - snakeLength; row++) {
+        bool canPlace = true;
+        List<Map<String, int>> segment = [];
+        for (int i = 0; i < snakeLength; i++) {
+          String posKey = '$col-${row + i}';
+          if (occupied.contains(posKey)) {
+            canPlace = false;
+            break;
+          }
+          segment.add({'col': col, 'row': row + i});
+        }
+        if (canPlace) possiblePositions.add(segment);
+      }
+    }
+    if (possiblePositions.isNotEmpty) {
+      snakePositions = possiblePositions[random.nextInt(possiblePositions.length)];
+    } else {
+      snakePositions = [];
+    }
+    setState(() {});
   }
 
   Future<void> _loadObjects() async {
@@ -53,12 +118,29 @@ class _GameCanvasState extends State<GameCanvas> {
       _generateRandomFoodItems();
       _generateRandomDangerItems();
       _generateRandomExitItems();
+      _loadSnake(); // Load snake after all items are placed
     } catch (e) {
       setState(() {
         objects = null;
         isLoadingObjects = false;
       });
     }
+  }
+
+  // Helper to get snake settings from gridItemOptions or snakeSettings
+  Map<String, dynamic>? getSnakeSettings(Map<String, dynamic>? config) {
+    if (config == null) return null;
+    if (config.containsKey('snakeSettings')) {
+      return config['snakeSettings'] as Map<String, dynamic>?;
+    }
+    // fallback to gridItemOptions for backward compatibility
+    if (config.containsKey('gridItemOptions')) {
+      final grid = config['gridItemOptions'];
+      if (grid is Map<String, dynamic> && grid.containsKey('snakeSettings')) {
+        return grid['snakeSettings'] as Map<String, dynamic>?;
+      }
+    }
+    return null;
   }
 
   /// Generates random food items and places them on unoccupied grid positions.
@@ -322,6 +404,25 @@ class _GameCanvasState extends State<GameCanvas> {
                   child: Image.asset(
                     imagePath,
                     fit: BoxFit.contain,
+                  ),
+                );
+              }).toList(),
+            // Draw snake on the grid
+            if (snakePositions.isNotEmpty)
+              ...snakePositions.map((pos) {
+                final int col = pos['col']!;
+                final int row = pos['row']!;
+                return Positioned(
+                  left: col * cellSize,
+                  top: row * cellSize,
+                  width: cellSize,
+                  height: cellSize,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      border: Border.all(color: Colors.black, width: 2),
+                      shape: BoxShape.rectangle,
+                    ),
                   ),
                 );
               }).toList(),
