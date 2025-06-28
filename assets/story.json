@@ -1,0 +1,9 @@
+{
+    "title":"Play Story",
+    "appBarSettings":{
+        "showScore":true,
+        "showLives":true,
+        "showCoins":true,
+        "showLevel":true
+    }
+}

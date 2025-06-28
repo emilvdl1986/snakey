@@ -1,0 +1,9 @@
+{
+    "title":"Play Endless",
+    "appBarSettings":{
+        "showScore":true,
+        "showLives":true,
+        "showCoins":true,
+        "showLevel":false
+    }
+}
