@@ -2,6 +2,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:snakey/components/count_down.dart';
+
+enum SnakeDirection { up, down, left, right }
 
 class GameCanvas extends StatefulWidget {
   final int columns;
@@ -36,6 +39,10 @@ class _GameCanvasState extends State<GameCanvas> {
 
   Map<String, dynamic>? snakeSettings;
   List<Map<String, int>> snakePositions = [];
+
+  SnakeDirection snakeDirection = SnakeDirection.right;
+
+  bool _showCountdown = true;
 
   @override
   void initState() {
@@ -294,6 +301,40 @@ class _GameCanvasState extends State<GameCanvas> {
     }
   }
 
+  // Moves the snake one step in the current direction
+  void _snakeMoving() {
+    if (snakePositions.isEmpty) return;
+    // Get current head
+    final head = snakePositions.first;
+    int newCol = head['col']!;
+    int newRow = head['row']!;
+    switch (snakeDirection) {
+      case SnakeDirection.up:
+        newRow -= 1;
+        break;
+      case SnakeDirection.down:
+        newRow += 1;
+        break;
+      case SnakeDirection.left:
+        newCol -= 1;
+        break;
+      case SnakeDirection.right:
+        newCol += 1;
+        break;
+    }
+    // Insert new head
+    snakePositions.insert(0, {'col': newCol, 'row': newRow});
+    // Remove tail
+    snakePositions.removeLast();
+    setState(() {});
+  }
+
+  void _onCountdownFinished() {
+    setState(() {
+      _showCountdown = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width - (widget.padding * 2);
@@ -325,6 +366,7 @@ class _GameCanvasState extends State<GameCanvas> {
         decoration: decoration,
         child: Stack(
           children: [
+            // Always show the grid and objects
             GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -377,7 +419,9 @@ class _GameCanvasState extends State<GameCanvas> {
                 final int col = danger['col'];
                 final int row = danger['row'];
                 final String? imagePath = danger['object']['image'];
-                if (imagePath == null) return const SizedBox.shrink();
+                if (imagePath == null) {
+                  return const SizedBox.shrink();
+                }
                 return Positioned(
                   left: col * cellSize,
                   top: row * cellSize,
@@ -395,7 +439,9 @@ class _GameCanvasState extends State<GameCanvas> {
                 final int col = exit['col'];
                 final int row = exit['row'];
                 final String? imagePath = exit['object']['image'];
-                if (imagePath == null) return const SizedBox.shrink();
+                if (imagePath == null) {
+                  return const SizedBox.shrink();
+                }
                 return Positioned(
                   left: col * cellSize,
                   top: row * cellSize,
@@ -415,7 +461,6 @@ class _GameCanvasState extends State<GameCanvas> {
                 final int row = entry.value['row']!;
                 final bool isHead = idx == 0;
                 final bool isTail = idx == snakePositions.length - 1;
-                // Tail is 70%, rest is 90%
                 final double size = isTail ? cellSize * 0.7 : cellSize * 0.9;
                 final double offset = (cellSize - size) / 2;
                 return Positioned(
@@ -433,7 +478,6 @@ class _GameCanvasState extends State<GameCanvas> {
                         ),
                       ),
                       if (isHead)
-                        // Draw two evenly positioned black eyes on the head
                         Align(
                           alignment: Alignment.topCenter,
                           child: Padding(
@@ -466,6 +510,19 @@ class _GameCanvasState extends State<GameCanvas> {
                   ),
                 );
               }).toList(),
+            // Show countdown overlay if needed
+            if (_showCountdown)
+              Positioned.fill(
+                child: CountDown(
+                  seconds: 3,
+                  onFinished: _onCountdownFinished,
+                  textStyle: TextStyle(
+                    fontSize: 64,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
