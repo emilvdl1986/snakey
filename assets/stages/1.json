@@ -9,7 +9,8 @@
             "backgroundCoverColor":false,
             "backgroundCoverImage":"floor-grass.jpg",
             "foodLimit":5,
-            "dangerItemsLimit":2
+            "dangerItemsLimit":2,
+            "exitItemsLimit":1
         }
     }
 }

@@ -8,5 +8,9 @@
         "type":"danger",
         "image":"assets/objects/fire.png",
         "action":"shrink"
+    }, {
+        "type":"exit",
+        "image":"assets/objects/door.png",
+        "action":"nextStage"
     }
 ]
