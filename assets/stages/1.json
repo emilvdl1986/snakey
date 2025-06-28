@@ -7,7 +7,9 @@
         "backgroundImage":false,
         "gridItemOptions":{
             "backgroundCoverColor":false,
-            "backgroundCoverImage":"floor-grass.jpg"
+            "backgroundCoverImage":"floor-grass.jpg",
+            "foodLimit":5,
+            "dangerItemsLimit":2
         }
     }
 }

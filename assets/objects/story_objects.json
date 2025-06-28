@@ -1,0 +1,12 @@
+[
+    {
+        "type":"food",
+        "image":"assets/objects/burger.png",
+        "action":"grow"
+    },
+    {
+        "type":"danger",
+        "image":"assets/objects/fire.png",
+        "action":"shrink"
+    }
+]

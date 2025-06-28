@@ -68,6 +68,8 @@ flutter:
      - assets/images/logo.png
      - assets/stages/1.json
      - assets/decorations/floor-grass.jpg
+     - assets/objects/burger.png
+     - assets/objects/fire.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
