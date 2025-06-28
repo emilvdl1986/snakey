@@ -8,6 +8,8 @@
     },
     "gridSettings":{
         "columns":10,
-        "rows":10
+        "rows":10,
+        "backgroundColor":"red",
+        "backgroundImage":false
     }
 }

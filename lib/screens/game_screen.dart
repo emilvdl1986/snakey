@@ -80,6 +80,8 @@ class _GameScreenState extends State<GameScreen> {
                       child: GameCanvas(
                         columns: gridSettings!['columns'] ?? 0,
                         rows: gridSettings!['rows'] ?? 0,
+                        backgroundColor: gridSettings!['backgroundColor'],
+                        backgroundImage: gridSettings!['backgroundImage'] ?? false,
                       ),
                     )
                   : const Center(child: Text('Grid settings not found'))),
