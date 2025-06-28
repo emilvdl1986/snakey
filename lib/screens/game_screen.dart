@@ -70,18 +70,19 @@ class _GameScreenState extends State<GameScreen> {
         showCoins: appBarSettings?['showCoins'] ?? false,
         showLevel: appBarSettings?['showLevel'] ?? false,
       ),
-      body: Center(
-        child: isLoading
-            ? const CircularProgressIndicator()
-            : error != null
-                ? Text(error!, style: const TextStyle(color: Colors.red))
-                : (gridSettings != null
-                    ? GameCanvas(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+              ? Center(child: Text(error!, style: const TextStyle(color: Colors.red)))
+              : (gridSettings != null
+                  ? Container(
+                      color: Colors.black,
+                      child: GameCanvas(
                         columns: gridSettings!['columns'] ?? 0,
                         rows: gridSettings!['rows'] ?? 0,
-                      )
-                    : const Text('Grid settings not found')),
-      ),
+                      ),
+                    )
+                  : const Center(child: Text('Grid settings not found'))),
     );
   }
 }
