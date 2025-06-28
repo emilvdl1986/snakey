@@ -7,9 +7,13 @@
         "showLevel":false
     },
     "gridSettings":{
-        "columns":10,
-        "rows":10,
+        "columns":20,
+        "rows":20,
         "backgroundColor":"red",
-        "backgroundImage":false
+        "backgroundImage":false,
+         "gridItemOptions":{
+            "backgroundCoverColor":false,
+            "backgroundCoverImage":"floor-grass.jpg"
+        }
     }
 }

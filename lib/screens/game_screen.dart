@@ -82,6 +82,7 @@ class _GameScreenState extends State<GameScreen> {
                         rows: gridSettings!['rows'] ?? 0,
                         backgroundColor: gridSettings!['backgroundColor'],
                         backgroundImage: gridSettings!['backgroundImage'] ?? false,
+                        gridItemOptions: gridSettings!['gridItemOptions'] as Map<String, dynamic>?,
                       ),
                     )
                   : const Center(child: Text('Grid settings not found'))),

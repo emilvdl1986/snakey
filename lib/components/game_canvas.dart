@@ -6,6 +6,7 @@ class GameCanvas extends StatelessWidget {
   final double padding;
   final String? backgroundColor;
   final bool backgroundImage;
+  final Map<String, dynamic>? gridItemOptions;
 
   const GameCanvas({
     super.key,
@@ -14,6 +15,7 @@ class GameCanvas extends StatelessWidget {
     this.padding = 16.0,
     this.backgroundColor,
     this.backgroundImage = false,
+    this.gridItemOptions,
   });
 
   Color? _parseColor(String? colorString) {
@@ -63,6 +65,9 @@ class GameCanvas extends StatelessWidget {
       );
     }
 
+    final bool coverColor = gridItemOptions?['backgroundCoverColor'] ?? false;
+    final String? coverImage = gridItemOptions?['backgroundCoverImage'];
+
     return Padding(
       padding: EdgeInsets.only(left: padding, right: padding),
       child: Container(
@@ -76,13 +81,25 @@ class GameCanvas extends StatelessWidget {
           ),
           itemCount: columns * rows,
           itemBuilder: (context, index) {
-            return Container(
-              margin: const EdgeInsets.all(1),
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                border: Border.all(color: Colors.black12),
-              ),
-            );
+            if (!coverColor && coverImage != null && coverImage.isNotEmpty) {
+              return Container(
+                margin: const EdgeInsets.all(1),
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('assets/decorations/$coverImage'),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              );
+            } else {
+              return Container(
+                margin: const EdgeInsets.all(1),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  border: Border.all(color: Colors.black12),
+                ),
+              );
+            }
           },
         ),
       ),
