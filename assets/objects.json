@@ -1,0 +1,7 @@
+[
+    {
+        "type":"food", // the type of object
+        "action":"grow" // the action to perform on the object
+
+    }
+]
