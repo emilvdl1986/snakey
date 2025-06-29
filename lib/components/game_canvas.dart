@@ -42,6 +42,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   List<Map<String, int>> snakePositions = [];
 
   SnakeDirection snakeDirection = SnakeDirection.right;
+  SnakeDirection? _nextDirection;
 
   bool _showCountdown = true;
   Timer? _snakeTimer;
@@ -52,6 +53,8 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   Offset? _newHeadOffset;
   bool _isAnimating = false;
   int _pendingMoves = 0;
+
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -424,6 +427,11 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   // Moves the snake one step in the current direction
   void _snakeMoving() {
     if (_isAnimating || snakePositions.isEmpty) return;
+    // Use next direction if set
+    if (_nextDirection != null) {
+      snakeDirection = _nextDirection!;
+      _nextDirection = null;
+    }
     final head = snakePositions.first;
     int newCol = head['col']!;
     int newRow = head['row']!;
@@ -488,7 +496,33 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   void dispose() {
     _snakeTimer?.cancel();
     _moveController?.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onKey(RawKeyEvent event) {
+    if (event is RawKeyDownEvent) {
+      SnakeDirection? newDirection;
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        newDirection = SnakeDirection.up;
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        newDirection = SnakeDirection.down;
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+        newDirection = SnakeDirection.left;
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+        newDirection = SnakeDirection.right;
+      }
+      if (newDirection != null) {
+        // Prevent reversing direction
+        if ((snakeDirection == SnakeDirection.up && newDirection == SnakeDirection.down) ||
+            (snakeDirection == SnakeDirection.down && newDirection == SnakeDirection.up) ||
+            (snakeDirection == SnakeDirection.left && newDirection == SnakeDirection.right) ||
+            (snakeDirection == SnakeDirection.right && newDirection == SnakeDirection.left)) {
+          return;
+        }
+        _nextDirection = newDirection;
+      }
+    }
   }
 
   void _onCountdownFinished() {
@@ -521,182 +555,286 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     final bool coverColor = widget.gridItemOptions?['backgroundCoverColor'] ?? false;
     final String? coverImage = widget.gridItemOptions?['backgroundCoverImage'];
 
-    return Padding(
-      padding: EdgeInsets.only(left: widget.padding, right: widget.padding),
-      child: Container(
-        width: screenWidth,
-        height: gridHeight,
-        decoration: decoration,
-        child: Stack(
-          children: [
-            // Always show the grid and objects
-            GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: widget.columns,
-              ),
-              itemCount: widget.columns * widget.rows,
-              itemBuilder: (context, index) {
-                if (!coverColor && coverImage != null && coverImage.isNotEmpty) {
-                  return Container(
-                    margin: const EdgeInsets.all(1),
-                    decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage('assets/decorations/$coverImage'),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  );
-                } else {
-                  return Container(
-                    margin: const EdgeInsets.all(1),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900],
-                      border: Border.all(color: Colors.black12),
-                    ),
-                  );
-                }
-              },
-            ),
-            // Draw food items using their image
-            if (foodItems.isNotEmpty)
-              ...foodItems.map((food) {
-                final int col = food['col'];
-                final int row = food['row'];
-                final String? imagePath = food['object']['image'];
-                if (imagePath == null) return const SizedBox.shrink();
-                return Positioned(
-                  left: col * cellSize,
-                  top: row * cellSize,
-                  width: cellSize,
-                  height: cellSize,
-                  child: Image.asset(
-                    imagePath,
-                    fit: BoxFit.contain,
-                  ),
-                );
-              }).toList(),
-            // Draw danger items using their image
-            if (dangerItems.isNotEmpty)
-              ...dangerItems.map((danger) {
-                final int col = danger['col'];
-                final int row = danger['row'];
-                final String? imagePath = danger['object']['image'];
-                if (imagePath == null) {
-                  return const SizedBox.shrink();
-                }
-                return Positioned(
-                  left: col * cellSize,
-                  top: row * cellSize,
-                  width: cellSize,
-                  height: cellSize,
-                  child: Image.asset(
-                    imagePath,
-                    fit: BoxFit.contain,
-                  ),
-                );
-              }).toList(),
-            // Draw exit items using their image
-            if (exitItems.isNotEmpty)
-              ...exitItems.map((exit) {
-                final int col = exit['col'];
-                final int row = exit['row'];
-                final String? imagePath = exit['object']['image'];
-                if (imagePath == null) {
-                  return const SizedBox.shrink();
-                }
-                return Positioned(
-                  left: col * cellSize,
-                  top: row * cellSize,
-                  width: cellSize,
-                  height: cellSize,
-                  child: Image.asset(
-                    imagePath,
-                    fit: BoxFit.contain,
-                  ),
-                );
-              }).toList(),
-            // Draw snake on the grid
-            if (snakePositions.isNotEmpty)
-              ...snakePositions.asMap().entries.map((entry) {
-                final int idx = entry.key;
-                final int col = entry.value['col']!;
-                final int row = entry.value['row']!;
-                final bool isHead = idx == 0;
-                final bool isTail = idx == snakePositions.length - 1;
-                final double size = isTail ? cellSize * 0.7 : cellSize * 0.9;
-                final double offset = (cellSize - size) / 2;
-                double left = col * cellSize + offset;
-                double top = row * cellSize + offset;
-                if (_isAnimating && _segmentOldOffsets != null && _segmentNewOffsets != null && idx < _segmentOldOffsets!.length) {
-                  final old = _segmentOldOffsets![idx];
-                  final newO = _segmentNewOffsets![idx];
-                  final dx = old.dx + (newO.dx - old.dx) * (_moveAnimation?.value ?? 0);
-                  final dy = old.dy + (newO.dy - old.dy) * (_moveAnimation?.value ?? 0);
-                  left = dx * cellSize + offset;
-                  top = dy * cellSize + offset;
-                }
-                return Positioned(
-                  left: left,
-                  top: top,
-                  width: size,
-                  height: size,
-                  child: Stack(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          border: Border.all(color: Colors.black, width: 2),
-                          borderRadius: BorderRadius.circular(size * 0.3),
+    return RawKeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKey: _onKey,
+      child: Padding(
+        padding: EdgeInsets.only(left: widget.padding, right: widget.padding),
+        child: Container(
+          width: screenWidth,
+          height: gridHeight,
+          decoration: decoration,
+          child: Stack(
+            children: [
+              // Always show the grid and objects
+              GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: widget.columns,
+                ),
+                itemCount: widget.columns * widget.rows,
+                itemBuilder: (context, index) {
+                  if (!coverColor && coverImage != null && coverImage.isNotEmpty) {
+                    return Container(
+                      margin: const EdgeInsets.all(1),
+                      decoration: BoxDecoration(
+                        image: DecorationImage(
+                          image: AssetImage('assets/decorations/$coverImage'),
+                          fit: BoxFit.cover,
                         ),
                       ),
-                      if (isHead)
-                        Align(
-                          alignment: Alignment.topCenter,
-                          child: Padding(
-                            padding: EdgeInsets.only(top: size * 0.18),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: size * 0.18,
-                                  height: size * 0.18,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                SizedBox(width: size * 0.18),
-                                Container(
-                                  width: size * 0.18,
-                                  height: size * 0.18,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ],
-                            ),
+                    );
+                  } else {
+                    return Container(
+                      margin: const EdgeInsets.all(1),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        border: Border.all(color: Colors.black12),
+                      ),
+                    );
+                  }
+                },
+              ),
+              // Draw food items using their image
+              if (foodItems.isNotEmpty)
+                ...foodItems.map((food) {
+                  final int col = food['col'];
+                  final int row = food['row'];
+                  final String? imagePath = food['object']['image'];
+                  if (imagePath == null) return const SizedBox.shrink();
+                  return Positioned(
+                    left: col * cellSize,
+                    top: row * cellSize,
+                    width: cellSize,
+                    height: cellSize,
+                    child: Image.asset(
+                      imagePath,
+                      fit: BoxFit.contain,
+                    ),
+                  );
+                }).toList(),
+              // Draw danger items using their image
+              if (dangerItems.isNotEmpty)
+                ...dangerItems.map((danger) {
+                  final int col = danger['col'];
+                  final int row = danger['row'];
+                  final String? imagePath = danger['object']['image'];
+                  if (imagePath == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned(
+                    left: col * cellSize,
+                    top: row * cellSize,
+                    width: cellSize,
+                    height: cellSize,
+                    child: Image.asset(
+                      imagePath,
+                      fit: BoxFit.contain,
+                    ),
+                  );
+                }).toList(),
+              // Draw exit items using their image
+              if (exitItems.isNotEmpty)
+                ...exitItems.map((exit) {
+                  final int col = exit['col'];
+                  final int row = exit['row'];
+                  final String? imagePath = exit['object']['image'];
+                  if (imagePath == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned(
+                    left: col * cellSize,
+                    top: row * cellSize,
+                    width: cellSize,
+                    height: cellSize,
+                    child: Image.asset(
+                      imagePath,
+                      fit: BoxFit.contain,
+                    ),
+                  );
+                }).toList(),
+              // Draw snake on the grid
+              if (snakePositions.isNotEmpty)
+                ...snakePositions.asMap().entries.map((entry) {
+                  final int idx = entry.key;
+                  final int col = entry.value['col']!;
+                  final int row = entry.value['row']!;
+                  final bool isHead = idx == 0;
+                  final bool isTail = idx == snakePositions.length - 1;
+                  final double size = isTail ? cellSize * 0.7 : cellSize * 0.9;
+                  final double offset = (cellSize - size) / 2;
+                  double left = col * cellSize + offset;
+                  double top = row * cellSize + offset;
+                  if (_isAnimating && _segmentOldOffsets != null && _segmentNewOffsets != null && idx < _segmentOldOffsets!.length) {
+                    final old = _segmentOldOffsets![idx];
+                    final newO = _segmentNewOffsets![idx];
+                    final dx = old.dx + (newO.dx - old.dx) * (_moveAnimation?.value ?? 0);
+                    final dy = old.dy + (newO.dy - old.dy) * (_moveAnimation?.value ?? 0);
+                    left = dx * cellSize + offset;
+                    top = dy * cellSize + offset;
+                  }
+                  return Positioned(
+                    left: left,
+                    top: top,
+                    width: size,
+                    height: size,
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            border: Border.all(color: Colors.black, width: 2),
+                            borderRadius: BorderRadius.circular(size * 0.3),
                           ),
                         ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            // Show countdown overlay if needed
-            if (_showCountdown)
-              Positioned.fill(
-                child: CountDown(
-                  seconds: 3,
-                  onFinished: _onCountdownFinished,
-                  textStyle: TextStyle(
-                    fontSize: 64,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                        if (isHead)
+                          Builder(
+                            builder: (context) {
+                              // Eye positioning based on direction
+                              switch (snakeDirection) {
+                                case SnakeDirection.up:
+                                  return Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(top: size * 0.10),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: size * 0.18,
+                                            height: size * 0.18,
+                                            margin: EdgeInsets.only(right: size * 0.05),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          Container(
+                                            width: size * 0.18,
+                                            height: size * 0.18,
+                                            margin: EdgeInsets.only(left: size * 0.05),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                case SnakeDirection.down:
+                                  return Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(bottom: size * 0.10),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: size * 0.18,
+                                            height: size * 0.18,
+                                            margin: EdgeInsets.only(right: size * 0.05),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          Container(
+                                            width: size * 0.18,
+                                            height: size * 0.18,
+                                            margin: EdgeInsets.only(left: size * 0.05),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                case SnakeDirection.left:
+                                  return Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(left: size * 0.10),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: size * 0.18,
+                                            height: size * 0.18,
+                                            margin: EdgeInsets.only(bottom: size * 0.05),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          Container(
+                                            width: size * 0.18,
+                                            height: size * 0.18,
+                                            margin: EdgeInsets.only(top: size * 0.05),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                case SnakeDirection.right:
+                                  return Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(right: size * 0.10),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: size * 0.18,
+                                            height: size * 0.18,
+                                            margin: EdgeInsets.only(bottom: size * 0.05),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          Container(
+                                            width: size * 0.18,
+                                            height: size * 0.18,
+                                            margin: EdgeInsets.only(top: size * 0.05),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              // Show countdown overlay if needed
+              if (_showCountdown)
+                Positioned.fill(
+                  child: CountDown(
+                    seconds: 3,
+                    onFinished: _onCountdownFinished,
+                    textStyle: TextStyle(
+                      fontSize: 64,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
