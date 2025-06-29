@@ -67,6 +67,7 @@ flutter:
      - assets/images/background.png
      - assets/images/logo.png
      - assets/stages/1.json
+     - assets/stages/2.json
      - assets/decorations/floor-grass.jpg
      - assets/objects/burger.png
      - assets/objects/fire.png

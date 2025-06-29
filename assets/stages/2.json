@@ -1,0 +1,27 @@
+{
+    
+    "gridSettings":{
+        "columns":10,
+        "rows":10,
+        "backgroundColor":"blue",
+        "backgroundImage":false,
+        "gridItemOptions":{
+            "backgroundCoverColor":false,
+            "backgroundCoverImage":"floor-grass.jpg",
+            "foodLimit":100,
+            "foodTrigger":true,
+            "dangerItemsLimit":2,
+            "exitItemsLimit":1,
+            "heartItemsLimit":1,
+            "coinItemsLimit":1,
+            "keyItemsLimit":1
+        }
+    },
+    "snakeSettings":{
+        "initialLength":3,
+        "color":"yellow",
+        "speed":1,
+        "canGoThroughBorders":false
+       
+    }
+}

@@ -22,6 +22,7 @@ class _GameScreenState extends State<GameScreen> {
   int score = 0;
   int livesLeft = 3;
   int coins = 0;
+  int currentLevel = 1; // LIFTED STATE
 
   @override
   void initState() {
@@ -44,7 +45,7 @@ class _GameScreenState extends State<GameScreen> {
         final String storyJson = await rootBundle.loadString('assets/story.json');
         final Map<String, dynamic> loadedStory = json.decode(storyJson);
         // Load stage json for gridSettings
-        final String stageJson = await rootBundle.loadString('assets/stages/$stage.json');
+        final String stageJson = await rootBundle.loadString('assets/stages/$currentLevel.json');
         final Map<String, dynamic> loadedStage = json.decode(stageJson);
         setState(() {
           storyData = loadedStory;
@@ -57,6 +58,33 @@ class _GameScreenState extends State<GameScreen> {
       setState(() {
         error = 'Could not load grid settings for mode: ${widget.mode}';
         isLoading = false;
+      });
+    }
+  }
+
+  void _handleLevelChanged(int newLevel) async {
+    if (widget.mode == 'story') {
+      // Reload stage file for new level
+      setState(() {
+        isLoading = true;
+      });
+      try {
+        final String stageJson = await rootBundle.loadString('assets/stages/$newLevel.json');
+        final Map<String, dynamic> loadedStage = json.decode(stageJson);
+        setState(() {
+          currentLevel = newLevel;
+          gridSettings = loadedStage['gridSettings'] as Map<String, dynamic>?;
+          isLoading = false;
+        });
+      } catch (e) {
+        setState(() {
+          error = 'Could not load grid settings for level $newLevel';
+          isLoading = false;
+        });
+      }
+    } else {
+      setState(() {
+        currentLevel = newLevel;
       });
     }
   }
@@ -75,6 +103,7 @@ class _GameScreenState extends State<GameScreen> {
         score: score,
         livesLeft: livesLeft,
         coins: coins,
+        currentLevel: currentLevel, // FIXED: was 'level:'
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -84,6 +113,7 @@ class _GameScreenState extends State<GameScreen> {
                   ? Container(
                       color: Colors.black,
                       child: GameCanvas(
+                        key: ValueKey(currentLevel), // Force full rebuild on level change
                         columns: gridSettings!['columns'] ?? 0,
                         rows: gridSettings!['rows'] ?? 0,
                         backgroundColor: gridSettings!['backgroundColor'],
@@ -105,6 +135,8 @@ class _GameScreenState extends State<GameScreen> {
                             coins = newCoins;
                           });
                         },
+                        currentLevel: currentLevel,
+                        onLevelChanged: _handleLevelChanged,
                       ),
                     )
                   : const Center(child: Text('Grid settings not found'))),

@@ -19,6 +19,8 @@ class GameCanvas extends StatefulWidget {
   final ValueChanged<int>? onScoreChanged;
   final ValueChanged<int>? onLivesChanged;
   final ValueChanged<int>? onCoinsChanged;
+  final int currentLevel;
+  final ValueChanged<int>? onLevelChanged;
 
   const GameCanvas({
     super.key,
@@ -32,6 +34,8 @@ class GameCanvas extends StatefulWidget {
     this.onScoreChanged,
     this.onLivesChanged,
     this.onCoinsChanged,
+    required this.currentLevel,
+    this.onLevelChanged,
   });
 
   @override
@@ -78,8 +82,6 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   int _lastPointsGained = 0;
   int _lastCoinsGained = 0;
   int _lastLivesGained = 0;
-  int currentLevel = 1; // Only used in story mode
-
   // Track values at the start of each level for gain calculation
   int _startScore = 0;
   int _startCoins = 0;
@@ -296,13 +298,13 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   }
 
   Future<void> _loadObjects() async {
-    String file = widget.mode == 'endless'
+    String objectsFile = widget.mode == 'endless'
         ? 'assets/objects/endless_objects.json'
         : 'assets/objects/story_objects.json';
     try {
-      final String jsonString = await rootBundle.loadString(file);
+      final String objectsJson = await rootBundle.loadString(objectsFile);
       setState(() {
-        objects = json.decode(jsonString);
+        objects = json.decode(objectsJson);
         isLoadingObjects = false;
       });
       _generateRandomFoodItems();
@@ -963,12 +965,14 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
                           label: "Continue",
                           onPressed: () {
                             Navigator.of(context).pop();
+                            if (widget.onLevelChanged != null) {
+                              widget.onLevelChanged!(widget.currentLevel + 1);
+                            }
                             setState(() {
-                              currentLevel += 1;
                               _isLevelComplete = false;
                               _showCountdown = true;
                             });
-                            _resetGame(keepScore: true, keepLives: true, keepCoins: true, nextLevel: true);
+                            // _resetGame will be called after parent updates props
                           },
                         ),
                       ] else ...[
@@ -1044,7 +1048,6 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       if (!keepScore) score = 0;
       if (!keepLives) livesLeft = 3;
       if (!keepCoins) coins = 0;
-      if (nextLevel) currentLevel += 1;
       foodItems.clear();
       dangerItems.clear();
       exitItems.clear();
