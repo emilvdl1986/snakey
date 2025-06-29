@@ -514,6 +514,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       if (newRow > maxRow) newRow = 0;
     } else {
       if (newCol < 0 || newCol > maxCol || newRow < 0 || newRow > maxRow) {
+        gameOver();
         return;
       }
     }
