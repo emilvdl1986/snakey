@@ -8,6 +8,8 @@ class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showLevel;
   final int score;
   final int livesLeft;
+  final int coins;
+  final int currentLevel;
 
   const GameAppBar({
     super.key,
@@ -18,6 +20,8 @@ class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.showLevel = false,
     this.score = 0,
     this.livesLeft = 3,
+    this.coins = 0,
+    this.currentLevel = 1,
   });
 
   @override
@@ -67,14 +71,34 @@ class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
           if (showCoins)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4.0),
-              child: Icon(Icons.monetization_on, color: Colors.white),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.monetization_on, color: Colors.white),
+                  const SizedBox(width: 4),
+                  const Text('X', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(width: 2),
+                  Text(
+                    coins.toString(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ],
+              ),
             ),
           if (showLevel)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4.0),
-              child: Icon(Icons.bar_chart, color: Colors.white),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.bar_chart, color: Colors.white),
+                  const SizedBox(width: 4),
+                  Text(
+                    currentLevel.toString(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ],
+              ),
             ),
         ],
       ),
