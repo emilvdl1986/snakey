@@ -21,6 +21,7 @@ class _GameScreenState extends State<GameScreen> {
   int stage = 1;
   int score = 0;
   int livesLeft = 3;
+  int coins = 0;
 
   @override
   void initState() {
@@ -73,6 +74,7 @@ class _GameScreenState extends State<GameScreen> {
         showLevel: appBarSettings?['showLevel'] ?? false,
         score: score,
         livesLeft: livesLeft,
+        coins: coins,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -96,6 +98,11 @@ class _GameScreenState extends State<GameScreen> {
                         onLivesChanged: (newLives) {
                           setState(() {
                             livesLeft = newLives;
+                          });
+                        },
+                        onCoinsChanged: (newCoins) {
+                          setState(() {
+                            coins = newCoins;
                           });
                         },
                       ),

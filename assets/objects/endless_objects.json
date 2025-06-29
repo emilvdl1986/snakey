@@ -15,5 +15,16 @@
         "type":"exit",
         "image":"assets/objects/door.png",
         "action":"respawn"
+    }, {
+        "type":"heart",
+        "image":"assets/objects/heart.png",
+        "action":"give-life",
+        "points":5
+    },
+    {
+        "type":"coin",
+        "image":"assets/objects/coin.png",
+        "action":"collect-coin",
+        "points":10
     }
 ]

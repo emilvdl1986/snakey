@@ -17,13 +17,15 @@
             "foodLimit":30,
             "foodTrigger":true,
             "dangerItemsLimit":2,
-            "exitItemsLimit":5
+            "exitItemsLimit":5,
+            "heartItemsLimit":1,
+            "coinItemsLimit":1
         }
     },
     "snakeSettings":{
         "initialLength":3,
         "color":"green",
-        "speed":5,
+        "speed":50,
         "canGoThroughBorders":true
        
     }

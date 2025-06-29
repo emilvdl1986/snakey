@@ -17,6 +17,7 @@ class GameCanvas extends StatefulWidget {
   final String mode;
   final ValueChanged<int>? onScoreChanged;
   final ValueChanged<int>? onLivesChanged;
+  final ValueChanged<int>? onCoinsChanged;
 
   const GameCanvas({
     super.key,
@@ -29,6 +30,7 @@ class GameCanvas extends StatefulWidget {
     required this.mode,
     this.onScoreChanged,
     this.onLivesChanged,
+    this.onCoinsChanged,
   });
 
   @override
@@ -41,6 +43,8 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   List<Map<String, dynamic>> foodItems = [];
   List<Map<String, dynamic>> dangerItems = [];
   List<Map<String, dynamic>> exitItems = [];
+  List<Map<String, dynamic>> heartItems = [];
+  List<Map<String, dynamic>> coinItems = [];
 
   Map<String, dynamic>? snakeSettings;
   List<Map<String, int>> snakePositions = [];
@@ -60,9 +64,10 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   final FocusNode _focusNode = FocusNode();
 
-  int _snakeSpeed = 5; // default
+  int _snakeSpeed = 8; // default // max 8
   int score = 0;
   int livesLeft = 3;
+  int coins = 0;
 
   bool _isGameOver = false;
 
@@ -72,12 +77,16 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     // Set random initial direction
     final directions = SnakeDirection.values;
     snakeDirection = directions[Random().nextInt(directions.length)];
-    // Load speed from snakeSettings if available
+    // Always load speed from snakeSettings in JSON (unless overridden elsewhere)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final settings = widget.gridItemOptions?['snakeSettings'];
+      final settings = widget.gridItemOptions?['snakeSettings'] ?? (widget.gridItemOptions?['snakeSettings'] ?? {});
       if (settings != null && settings['speed'] != null) {
         setState(() {
           _snakeSpeed = settings['speed'];
+        });
+      } else if (widget.gridItemOptions?['speed'] != null) {
+        setState(() {
+          _snakeSpeed = widget.gridItemOptions!['speed'];
         });
       }
       _setupAnimationController();
@@ -144,6 +153,12 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     }
     for (var exit in exitItems) {
       occupied.add('${exit['col']}-${exit['row']}');
+    }
+    for (var heart in heartItems) {
+      occupied.add('${heart['col']}-${heart['row']}');
+    }
+    for (var coin in coinItems) {
+      occupied.add('${coin['col']}-${coin['row']}');
     }
     // Try to find a horizontal or vertical segment of length snakeLength
     final Random random = Random();
@@ -276,6 +291,8 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       _generateRandomFoodItems();
       _generateRandomDangerItems();
       _generateRandomExitItems();
+      _generateRandomHeartItems();
+      _generateRandomCoinItems();
       _loadSnake(); // Load snake after all items are placed
     } catch (e) {
       setState(() {
@@ -453,6 +470,128 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     setState(() {});
   }
 
+  /// Generates random heart items and places them on unoccupied grid positions.
+  /// Returns a list of maps with heart object and its position.
+  void _generateRandomHeartItems({List<List<int>>? occupied}) {
+    if (objects == null || widget.gridItemOptions == null) return;
+    final int heartLimit = widget.gridItemOptions?['heartItemsLimit'] ?? 1;
+    final List<Map<String, int>> occupiedPositions = [];
+    // Add all food, danger, exit, coin, and snake positions to occupied
+    for (var food in foodItems) {
+      occupiedPositions.add({'col': food['col'], 'row': food['row']});
+    }
+    for (var danger in dangerItems) {
+      occupiedPositions.add({'col': danger['col'], 'row': danger['row']});
+    }
+    for (var exit in exitItems) {
+      occupiedPositions.add({'col': exit['col'], 'row': exit['row']});
+    }
+    for (var coin in coinItems) {
+      occupiedPositions.add({'col': coin['col'], 'row': coin['row']});
+    }
+    for (var segment in snakePositions) {
+      occupiedPositions.add({'col': segment['col']!, 'row': segment['row']!});
+    }
+    // Add any custom occupied positions
+    if (occupied != null) {
+      for (var pos in occupied) {
+        occupiedPositions.add({'col': pos[0], 'row': pos[1]});
+      }
+    }
+    final List<dynamic> heartObjects = objects!.where((obj) => obj['type'] == 'heart').toList();
+    final Random random = Random();
+    final Set<String> usedPositions = {};
+    heartItems.clear();
+    int count = heartLimit > 0 ? random.nextInt(heartLimit) + 1 : 1;
+    for (int i = 0; i < count; i++) {
+      int col, row;
+      String posKey;
+      bool found = false;
+      for (int tries = 0; tries < 100; tries++) {
+        col = random.nextInt(widget.columns);
+        row = random.nextInt(widget.rows);
+        posKey = '$col-$row';
+        if (!usedPositions.contains(posKey) &&
+            !occupiedPositions.any((o) => o['col'] == col && o['row'] == row)) {
+          usedPositions.add(posKey);
+          final heartObj = heartObjects[random.nextInt(heartObjects.length)];
+          heartItems.add({
+            'object': heartObj,
+            'col': col,
+            'row': row,
+          });
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        break;
+      }
+    }
+    setState(() {});
+  }
+
+  /// Generates random coin items and places them on unoccupied grid positions.
+  /// Returns a list of maps with coin object and its position.
+  void _generateRandomCoinItems({List<List<int>>? occupied}) {
+    if (objects == null || widget.gridItemOptions == null) return;
+    final int coinLimit = widget.gridItemOptions?['coinItemsLimit'] ?? 1;
+    final List<Map<String, int>> occupiedPositions = [];
+    // Add all food, danger, exit, heart, and snake positions to occupied
+    for (var food in foodItems) {
+      occupiedPositions.add({'col': food['col'], 'row': food['row']});
+    }
+    for (var danger in dangerItems) {
+      occupiedPositions.add({'col': danger['col'], 'row': danger['row']});
+    }
+    for (var exit in exitItems) {
+      occupiedPositions.add({'col': exit['col'], 'row': exit['row']});
+    }
+    for (var heart in heartItems) {
+      occupiedPositions.add({'col': heart['col'], 'row': heart['row']});
+    }
+    for (var segment in snakePositions) {
+      occupiedPositions.add({'col': segment['col']!, 'row': segment['row']!});
+    }
+    // Add any custom occupied positions
+    if (occupied != null) {
+      for (var pos in occupied) {
+        occupiedPositions.add({'col': pos[0], 'row': pos[1]});
+      }
+    }
+    final List<dynamic> coinObjects = objects!.where((obj) => obj['type'] == 'coin').toList();
+    final Random random = Random();
+    final Set<String> usedPositions = {};
+    coinItems.clear();
+    int count = coinLimit > 0 ? random.nextInt(coinLimit) + 1 : 1;
+    for (int i = 0; i < count; i++) {
+      int col, row;
+      String posKey;
+      bool found = false;
+      for (int tries = 0; tries < 100; tries++) {
+        col = random.nextInt(widget.columns);
+        row = random.nextInt(widget.rows);
+        posKey = '$col-$row';
+        if (!usedPositions.contains(posKey) &&
+            !occupiedPositions.any((o) => o['col'] == col && o['row'] == row)) {
+          usedPositions.add(posKey);
+          final coinObj = coinObjects[random.nextInt(coinObjects.length)];
+          coinItems.add({
+            'object': coinObj,
+            'col': col,
+            'row': row,
+          });
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        break;
+      }
+    }
+    setState(() {});
+  }
+
   Color? _parseColor(String? colorString) {
     if (colorString == null) return null;
     switch (colorString.toLowerCase()) {
@@ -548,6 +687,18 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       foundExit = exitMatches.first;
       triggerObjectAction(foundExit['object'], col: newCol, row: newRow);
     }
+    // Check for heart at new head position
+    final heartMatches = heartItems.where((item) => item['col'] == newCol && item['row'] == newRow).toList();
+    if (heartMatches.isNotEmpty) {
+      final foundHeart = heartMatches.first;
+      triggerObjectAction(foundHeart['object'], col: newCol, row: newRow);
+    }
+    // Check for coin at new head position
+    final coinMatches = coinItems.where((item) => item['col'] == newCol && item['row'] == newRow).toList();
+    if (coinMatches.isNotEmpty) {
+      final foundCoin = coinMatches.first;
+      triggerObjectAction(foundCoin['object'], col: newCol, row: newRow);
+    }
 
     // Animate all segments
     List<Offset> oldOffsets = snakePositions.map((s) => Offset(s['col']!.toDouble(), s['row']!.toDouble())).toList();
@@ -630,6 +781,8 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       dangerItems.clear();
       exitItems.clear();
       snakePositions.clear();
+      heartItems.clear();
+      coinItems.clear();
       _showCountdown = true;
       _pendingMoves = 0;
       _nextDirection = null;
@@ -654,6 +807,8 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       dangerItems.clear();
       exitItems.clear();
       snakePositions.clear();
+      heartItems.clear();
+      coinItems.clear();
       _showCountdown = true;
       _pendingMoves = 0;
       _nextDirection = null;
@@ -789,6 +944,48 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         setState(() {});
       }
       // TODO: Implement other danger logic
+    } else if (object['type'] == 'heart') {
+      debugPrint('Heart collected!');
+      bool removed = false;
+      // Remove the heart item at the new head position
+      if (col != null && row != null) {
+        final beforeLen = heartItems.length;
+        heartItems.removeWhere((item) => item['col'] == col && item['row'] == row);
+        removed = heartItems.length < beforeLen;
+      }
+      if (removed) setState(() {});
+      // Increase lives
+      setState(() {
+        livesLeft += 1;
+      });
+      if (widget.onLivesChanged != null) {
+        widget.onLivesChanged!(livesLeft);
+      }
+      // Respawn heart if needed
+      if (heartItems.isEmpty && (widget.gridItemOptions?['heartTrigger'] == true)) {
+        _generateRandomHeartItems();
+      }
+    } else if (object['type'] == 'coin') {
+      debugPrint('Coin collected!');
+      bool removed = false;
+      // Remove the coin item at the new head position
+      if (col != null && row != null) {
+        final beforeLen = coinItems.length;
+        coinItems.removeWhere((item) => item['col'] == col && item['row'] == row);
+        removed = coinItems.length < beforeLen;
+      }
+      if (removed) setState(() {});
+      // Increase coins
+      setState(() {
+        coins += 1;
+      });
+      if (widget.onCoinsChanged != null) {
+        widget.onCoinsChanged!(coins);
+      }
+      // Respawn coin if needed
+      if (coinItems.isEmpty && (widget.gridItemOptions?['coinTrigger'] == true)) {
+        _generateRandomCoinItems();
+      }
     } else if (object['type'] == 'exit') {
       debugPrint('Exit reached!');
       // TODO: Implement exit logic
@@ -908,6 +1105,42 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
                   if (imagePath == null) {
                     return const SizedBox.shrink();
                   }
+                  return Positioned(
+                    left: col * cellSize,
+                    top: row * cellSize,
+                    width: cellSize,
+                    height: cellSize,
+                    child: Image.asset(
+                      imagePath,
+                      fit: BoxFit.contain,
+                    ),
+                  );
+                }).toList(),
+              // Draw heart items using their image
+              if (heartItems.isNotEmpty)
+                ...heartItems.map((heart) {
+                  final int col = heart['col'];
+                  final int row = heart['row'];
+                  final String? imagePath = heart['object']['image'];
+                  if (imagePath == null) return const SizedBox.shrink();
+                  return Positioned(
+                    left: col * cellSize,
+                    top: row * cellSize,
+                    width: cellSize,
+                    height: cellSize,
+                    child: Image.asset(
+                      imagePath,
+                      fit: BoxFit.contain,
+                    ),
+                  );
+                }).toList(),
+              // Draw coin items using their image
+              if (coinItems.isNotEmpty)
+                ...coinItems.map((coin) {
+                  final int col = coin['col'];
+                  final int row = coin['row'];
+                  final String? imagePath = coin['object']['image'];
+                  if (imagePath == null) return const SizedBox.shrink();
                   return Positioned(
                     left: col * cellSize,
                     top: row * cellSize,
