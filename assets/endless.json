@@ -14,7 +14,8 @@
         "gridItemOptions":{
             "backgroundCoverColor":false,
             "backgroundCoverImage":"floor-grass.jpg",
-            "foodLimit":5,
+            "foodLimit":30,
+            "foodTrigger":true,
             "dangerItemsLimit":2,
             "exitItemsLimit":1
         }

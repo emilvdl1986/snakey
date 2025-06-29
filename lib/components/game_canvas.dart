@@ -495,19 +495,19 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     final foodMatches = foodItems.where((item) => item['col'] == newCol && item['row'] == newRow).toList();
     if (foodMatches.isNotEmpty) {
       foundFood = foodMatches.first;
-      triggerObjectAction(foundFood['object']);
+      triggerObjectAction(foundFood['object'], col: newCol, row: newRow);
     }
     Map<String, dynamic>? foundDanger;
     final dangerMatches = dangerItems.where((item) => item['col'] == newCol && item['row'] == newRow).toList();
     if (dangerMatches.isNotEmpty) {
       foundDanger = dangerMatches.first;
-      triggerObjectAction(foundDanger['object']);
+      triggerObjectAction(foundDanger['object'], col: newCol, row: newRow);
     }
     Map<String, dynamic>? foundExit;
     final exitMatches = exitItems.where((item) => item['col'] == newCol && item['row'] == newRow).toList();
     if (exitMatches.isNotEmpty) {
       foundExit = exitMatches.first;
-      triggerObjectAction(foundExit['object']);
+      triggerObjectAction(foundExit['object'], col: newCol, row: newRow);
     }
 
     // Animate all segments
@@ -573,17 +573,45 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   /// Triggers a custom action based on the object the snake interacts with.
   /// You can expand this to handle different object types or properties.
-  void triggerObjectAction(Map<String, dynamic> object) {
+  void triggerObjectAction(Map<String, dynamic> object, {int? col, int? row}) {
     if (object['type'] == 'food') {
-      // Example: Increase score, grow snake, play sound, etc.
-      debugPrint('Food eaten!');
-      // TODO: Implement food logic
+      debugPrint('Food eaten! ${object['action']}');
+      bool removed = false;
+      if (object['action'] == 'grow') {
+        // Remove the food item at the new head position
+        if (col != null && row != null) {
+          final beforeLen = foodItems.length;
+          foodItems.removeWhere((item) => item['col'] == col && item['row'] == row);
+          removed = foodItems.length < beforeLen;
+        }
+        if (removed) setState(() {});
+        // If no food left and foodTrigger is true, generate new food
+        if (foodItems.isEmpty && (widget.gridItemOptions?['foodTrigger'] == true)) {
+          _generateRandomFoodItems();
+        }
+        // Grow the snake by adding a new block at the tail
+        if (snakePositions.isNotEmpty) {
+          final tail = snakePositions.last;
+          final beforeTail = snakePositions.length > 1 ? snakePositions[snakePositions.length - 2] : tail;
+          int dx = tail['col']! - beforeTail['col']!;
+          int dy = tail['row']! - beforeTail['row']!;
+          // Add new segment in the same direction as the tail
+          final newTail = {
+            'col': tail['col']! + dx,
+            'row': tail['row']! + dy,
+          };
+          // Clamp to grid
+          newTail['col'] = newTail['col']!.clamp(0, widget.columns - 1);
+          newTail['row'] = newTail['row']!.clamp(0, widget.rows - 1);
+          snakePositions.add(newTail);
+          setState(() {});
+        }
+      }
+      // TODO: Implement other food logic
     } else if (object['type'] == 'danger') {
-      // Example: End game, reduce life, play sound, etc.
       debugPrint('Danger hit!');
       // TODO: Implement danger logic
     } else if (object['type'] == 'exit') {
-      // Example: Complete level, show dialog, etc.
       debugPrint('Exit reached!');
       // TODO: Implement exit logic
     } else {

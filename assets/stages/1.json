@@ -9,6 +9,7 @@
             "backgroundCoverColor":false,
             "backgroundCoverImage":"floor-grass.jpg",
             "foodLimit":5,
+            "foodTrigger":true,
             "dangerItemsLimit":2,
             "exitItemsLimit":1
         }
