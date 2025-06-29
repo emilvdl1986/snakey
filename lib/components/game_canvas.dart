@@ -298,10 +298,25 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     if (objects == null || widget.gridItemOptions == null) return;
     final int foodLimit = widget.gridItemOptions?['foodLimit'] ?? 1;
     final List<Map<String, int>> occupiedPositions = [];
+    // Add all danger, exit, and snake positions to occupied
+    for (var danger in dangerItems) {
+      occupiedPositions.add({'col': danger['col'], 'row': danger['row']});
+    }
+    for (var exit in exitItems) {
+      occupiedPositions.add({'col': exit['col'], 'row': exit['row']});
+    }
+    for (var segment in snakePositions) {
+      occupiedPositions.add({'col': segment['col']!, 'row': segment['row']!});
+    }
+    // Add any custom occupied positions
     if (occupied != null) {
       for (var pos in occupied) {
         occupiedPositions.add({'col': pos[0], 'row': pos[1]});
       }
+    }
+    // Also add already placed food (if respawning multiple at once)
+    for (var food in foodItems) {
+      occupiedPositions.add({'col': food['col'], 'row': food['row']});
     }
     final List<dynamic> foodObjects = objects!.where((obj) => obj['type'] == 'food').toList();
     final Random random = Random();
@@ -309,22 +324,33 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     foodItems.clear();
     // Ensure at least 1 food item is generated
     int count = foodLimit > 0 ? random.nextInt(foodLimit) + 1 : 1;
+    int attempts = 0;
     for (int i = 0; i < count; i++) {
       int col, row;
       String posKey;
-      do {
+      bool found = false;
+      // Try up to 100 times to find a free spot
+      for (int tries = 0; tries < 100; tries++) {
         col = random.nextInt(widget.columns);
         row = random.nextInt(widget.rows);
         posKey = '$col-$row';
-      } while (usedPositions.contains(posKey) ||
-          occupiedPositions.any((o) => o['col'] == col && o['row'] == row));
-      usedPositions.add(posKey);
-      final foodObj = foodObjects[random.nextInt(foodObjects.length)];
-      foodItems.add({
-        'object': foodObj,
-        'col': col,
-        'row': row,
-      });
+        if (!usedPositions.contains(posKey) &&
+            !occupiedPositions.any((o) => o['col'] == col && o['row'] == row)) {
+          usedPositions.add(posKey);
+          final foodObj = foodObjects[random.nextInt(foodObjects.length)];
+          foodItems.add({
+            'object': foodObj,
+            'col': col,
+            'row': row,
+          });
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        // No free spot found, break early
+        break;
+      }
     }
     setState(() {});
   }
@@ -335,6 +361,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     if (objects == null || widget.gridItemOptions == null) return;
     final int dangerLimit = widget.gridItemOptions?['dangerItemsLimit'] ?? 1;
     final List<Map<String, int>> occupiedPositions = [];
+    // Add positions from argument
     if (occupied != null) {
       for (var pos in occupied) {
         occupiedPositions.add({'col': pos[0], 'row': pos[1]});
@@ -377,6 +404,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     if (objects == null || widget.gridItemOptions == null) return;
     final int exitLimit = widget.gridItemOptions?['exitItemsLimit'] ?? 1;
     final List<Map<String, int>> occupiedPositions = [];
+    // Add positions from argument
     if (occupied != null) {
       for (var pos in occupied) {
         occupiedPositions.add({'col': pos[0], 'row': pos[1]});
@@ -589,28 +617,49 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         if (foodItems.isEmpty && (widget.gridItemOptions?['foodTrigger'] == true)) {
           _generateRandomFoodItems();
         }
-        // Grow the snake by adding a new block at the tail
-        if (snakePositions.isNotEmpty) {
-          final tail = snakePositions.last;
-          final beforeTail = snakePositions.length > 1 ? snakePositions[snakePositions.length - 2] : tail;
-          int dx = tail['col']! - beforeTail['col']!;
-          int dy = tail['row']! - beforeTail['row']!;
-          // Add new segment in the same direction as the tail
-          final newTail = {
-            'col': tail['col']! + dx,
-            'row': tail['row']! + dy,
-          };
-          // Clamp to grid
-          newTail['col'] = newTail['col']!.clamp(0, widget.columns - 1);
-          newTail['row'] = newTail['row']!.clamp(0, widget.rows - 1);
-          snakePositions.add(newTail);
-          setState(() {});
+        // Grow the snake by adding new blocks at the tail
+        int growLength = 1;
+        if (object['growLength'] is int) {
+          growLength = object['growLength'];
         }
+        for (int i = 0; i < growLength; i++) {
+          if (snakePositions.isNotEmpty) {
+            final tail = snakePositions.last;
+            final beforeTail = snakePositions.length > 1 ? snakePositions[snakePositions.length - 2] : tail;
+            int dx = tail['col']! - beforeTail['col']!;
+            int dy = tail['row']! - beforeTail['row']!;
+            // Add new segment in the same direction as the tail
+            final newTail = {
+              'col': tail['col']! + dx,
+              'row': tail['row']! + dy,
+            };
+            // Clamp to grid
+            newTail['col'] = newTail['col']!.clamp(0, widget.columns - 1);
+            newTail['row'] = newTail['row']!.clamp(0, widget.rows - 1);
+            snakePositions.add(newTail);
+          }
+        }
+        setState(() {});
       }
       // TODO: Implement other food logic
     } else if (object['type'] == 'danger') {
       debugPrint('Danger hit!');
-      // TODO: Implement danger logic
+      if (object['action'] == 'shrink') {
+        int shrinkLength = 1;
+        if (object['shrinkLength'] is int) {
+          shrinkLength = object['shrinkLength'];
+        }
+        // Remove blocks from the tail, but keep at least 1 block
+        for (int i = 0; i < shrinkLength; i++) {
+          if (snakePositions.length > 1) {
+            snakePositions.removeLast();
+          } else {
+            break;
+          }
+        }
+        setState(() {});
+      }
+      // TODO: Implement other danger logic
     } else if (object['type'] == 'exit') {
       debugPrint('Exit reached!');
       // TODO: Implement exit logic

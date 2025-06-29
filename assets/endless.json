@@ -17,7 +17,7 @@
             "foodLimit":30,
             "foodTrigger":true,
             "dangerItemsLimit":2,
-            "exitItemsLimit":1
+            "exitItemsLimit":5
         }
     },
     "snakeSettings":{

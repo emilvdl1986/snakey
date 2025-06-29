@@ -2,11 +2,13 @@
     {
         "type":"food",
         "image":"assets/objects/burger.png",
-        "action":"grow"
+        "action":"grow",
+         "growLength":1
     }, {
         "type":"danger",
         "image":"assets/objects/fire.png",
-        "action":"shrink"
+        "action":"shrink",
+        "shrinkLength":1
     }, {
         "type":"exit",
         "image":"assets/objects/door.png",
