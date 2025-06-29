@@ -56,15 +56,35 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   final FocusNode _focusNode = FocusNode();
 
+  int _snakeSpeed = 5; // default
+
   @override
   void initState() {
     super.initState();
     // Set random initial direction
     final directions = SnakeDirection.values;
     snakeDirection = directions[Random().nextInt(directions.length)];
+    // Load speed from snakeSettings if available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final settings = widget.gridItemOptions?['snakeSettings'];
+      if (settings != null && settings['speed'] != null) {
+        setState(() {
+          _snakeSpeed = settings['speed'];
+        });
+      }
+      _setupAnimationController();
+    });
+    _loadObjects();
+  }
+
+  void _setupAnimationController() {
+    // Clamp speed to avoid division by zero or too fast/slow
+    final int speed = _snakeSpeed.clamp(1, 20);
+    final int durationMs = (400 / speed * 5).clamp(60, 1000).toInt(); // Higher speed = shorter duration
+    _moveController?.dispose();
     _moveController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: Duration(milliseconds: durationMs),
     );
     _moveAnimation = CurvedAnimation(
       parent: _moveController!,
@@ -87,7 +107,6 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         _snakeMoving();
       }
     });
-    _loadObjects();
   }
 
   Map<String, int>? _pendingNewHead;

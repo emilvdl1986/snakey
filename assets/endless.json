@@ -7,8 +7,8 @@
         "showLevel":false
     },
     "gridSettings":{
-        "columns":20,
-        "rows":20,
+        "columns":10,
+        "rows":10,
         "backgroundColor":"transparent",
         "backgroundImage":false,
         "gridItemOptions":{
@@ -22,7 +22,7 @@
     "snakeSettings":{
         "initialLength":3,
         "color":"green",
-        "speed":1,
+        "speed":5,
         "canGoThroughBorders":true
        
     }
