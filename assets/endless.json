@@ -19,7 +19,8 @@
             "dangerItemsLimit":2,
             "exitItemsLimit":5,
             "heartItemsLimit":1,
-            "coinItemsLimit":1
+            "coinItemsLimit":1,
+            "keyItemsLimit":10
         }
     },
     "snakeSettings":{

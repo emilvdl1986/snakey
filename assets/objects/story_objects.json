@@ -28,5 +28,10 @@
         "image":"assets/objects/coin.png",
         "action":"collect-coin",
         "points":10
+    },{
+        "type":"key",
+        "image":"assets/objects/key.png",
+        "action":"open-exits",
+        "points":100
     }
 ]
