@@ -16,6 +16,7 @@ class GameCanvas extends StatefulWidget {
   final Map<String, dynamic>? gridItemOptions;
   final String mode;
   final ValueChanged<int>? onScoreChanged;
+  final ValueChanged<int>? onLivesChanged;
 
   const GameCanvas({
     super.key,
@@ -27,6 +28,7 @@ class GameCanvas extends StatefulWidget {
     this.gridItemOptions,
     required this.mode,
     this.onScoreChanged,
+    this.onLivesChanged,
   });
 
   @override
@@ -60,6 +62,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   int _snakeSpeed = 5; // default
   int score = 0;
+  int livesLeft = 3;
 
   bool _isGameOver = false;
 
@@ -577,6 +580,10 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   void gameOver() {
     _isGameOver = true;
+    livesLeft = (livesLeft > 0) ? livesLeft - 1 : 0;
+    if (widget.onLivesChanged != null) {
+      widget.onLivesChanged!(livesLeft);
+    }
     _moveController?.stop();
     _snakeTimer?.cancel();
     _isAnimating = false;
@@ -589,6 +596,14 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         title: const Text('Game Over'),
         content: Text('Your score: $score'),
         actions: [
+          if (livesLeft > 0)
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _respawnSnake();
+              },
+              child: const Text('Respawn'),
+            ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
@@ -608,10 +623,33 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     );
   }
 
+  void _respawnSnake() {
+    setState(() {
+      _isGameOver = false;
+      foodItems.clear();
+      dangerItems.clear();
+      exitItems.clear();
+      snakePositions.clear();
+      _showCountdown = true;
+      _pendingMoves = 0;
+      _nextDirection = null;
+      _isAnimating = false;
+    });
+    _loadObjects();
+    // Do not reset score or livesLeft
+    if (widget.onScoreChanged != null) {
+      widget.onScoreChanged!(score);
+    }
+    if (widget.onLivesChanged != null) {
+      widget.onLivesChanged!(livesLeft);
+    }
+  }
+
   void _resetGame() {
     setState(() {
       _isGameOver = false;
       score = 0;
+      livesLeft = 3;
       foodItems.clear();
       dangerItems.clear();
       exitItems.clear();
@@ -623,6 +661,9 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     });
     if (widget.onScoreChanged != null) {
       widget.onScoreChanged!(score);
+    }
+    if (widget.onLivesChanged != null) {
+      widget.onLivesChanged!(livesLeft);
     }
     _loadObjects();
   }

@@ -7,6 +7,7 @@ class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showCoins;
   final bool showLevel;
   final int score;
+  final int livesLeft;
 
   const GameAppBar({
     super.key,
@@ -16,6 +17,7 @@ class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.showCoins = false,
     this.showLevel = false,
     this.score = 0,
+    this.livesLeft = 3,
   });
 
   @override
@@ -49,9 +51,20 @@ class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
           if (showLives)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4.0),
-              child: Icon(Icons.favorite, color: Colors.white),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.favorite, color: Colors.white),
+                  const SizedBox(width: 4),
+                  const Text('X', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(width: 2),
+                  Text(
+                    livesLeft.toString(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ],
+              ),
             ),
           if (showCoins)
             const Padding(
