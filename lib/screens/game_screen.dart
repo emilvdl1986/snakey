@@ -19,6 +19,7 @@ class _GameScreenState extends State<GameScreen> {
   bool isLoading = true;
   String? error;
   int stage = 1;
+  int score = 0;
 
   @override
   void initState() {
@@ -61,7 +62,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     final appBarSettings = data?['appBarSettings'] as Map<String, dynamic>?;
-    final title = data?['title'] ?? 'Game Screen ${widget.mode}';
+    final title = data?['title'] ?? 'Game Screen \\${widget.mode}';
     return Scaffold(
       appBar: GameAppBar(
         title: title,
@@ -69,6 +70,7 @@ class _GameScreenState extends State<GameScreen> {
         showLives: appBarSettings?['showLives'] ?? false,
         showCoins: appBarSettings?['showCoins'] ?? false,
         showLevel: appBarSettings?['showLevel'] ?? false,
+        score: score,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -84,6 +86,11 @@ class _GameScreenState extends State<GameScreen> {
                         backgroundImage: gridSettings!['backgroundImage'] ?? false,
                         gridItemOptions: gridSettings!['gridItemOptions'] as Map<String, dynamic>?,
                         mode: widget.mode,
+                        onScoreChanged: (newScore) {
+                          setState(() {
+                            score = newScore;
+                          });
+                        },
                       ),
                     )
                   : const Center(child: Text('Grid settings not found'))),

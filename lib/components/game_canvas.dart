@@ -15,6 +15,7 @@ class GameCanvas extends StatefulWidget {
   final bool backgroundImage;
   final Map<String, dynamic>? gridItemOptions;
   final String mode;
+  final ValueChanged<int>? onScoreChanged;
 
   const GameCanvas({
     super.key,
@@ -25,6 +26,7 @@ class GameCanvas extends StatefulWidget {
     this.backgroundImage = false,
     this.gridItemOptions,
     required this.mode,
+    this.onScoreChanged,
   });
 
   @override
@@ -57,6 +59,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   final FocusNode _focusNode = FocusNode();
 
   int _snakeSpeed = 5; // default
+  int score = 0;
 
   @override
   void initState() {
@@ -603,9 +606,20 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   /// You can expand this to handle different object types or properties.
   void triggerObjectAction(Map<String, dynamic> object, {int? col, int? row}) {
     if (object['type'] == 'food') {
-      debugPrint('Food eaten! ${object['action']}');
+      debugPrint('Food eaten! \\${object['action']}');
       bool removed = false;
       if (object['action'] == 'grow') {
+        // Add points from food
+        int points = 0;
+        if (object['points'] is int) {
+          points = object['points'];
+        }
+        setState(() {
+          score += points;
+        });
+        if (widget.onScoreChanged != null) {
+          widget.onScoreChanged!(score);
+        }
         // Remove the food item at the new head position
         if (col != null && row != null) {
           final beforeLen = foodItems.length;
@@ -648,6 +662,17 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         int shrinkLength = 1;
         if (object['shrinkLength'] is int) {
           shrinkLength = object['shrinkLength'];
+        }
+        // Subtract points from danger
+        int points = 0;
+        if (object['points'] is int) {
+          points = object['points'];
+        }
+        setState(() {
+          score += points; // points is negative in JSON for danger
+        });
+        if (widget.onScoreChanged != null) {
+          widget.onScoreChanged!(score);
         }
         // Remove blocks from the tail, but keep at least 1 block
         for (int i = 0; i < shrinkLength; i++) {
