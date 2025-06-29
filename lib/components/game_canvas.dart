@@ -61,6 +61,8 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   int _snakeSpeed = 5; // default
   int score = 0;
 
+  bool _isGameOver = false;
+
   @override
   void initState() {
     super.initState();
@@ -97,6 +99,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       setState(() {});
     });
     _moveController!.addStatusListener((status) {
+      if (_isGameOver) return;
       if (status == AnimationStatus.completed) {
         _isAnimating = false;
         _moveController!.reset();
@@ -476,7 +479,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   // Moves the snake one step in the current direction
   void _snakeMoving() {
-    if (_isAnimating || snakePositions.isEmpty) return;
+    if (_isGameOver || _isAnimating || snakePositions.isEmpty) return;
     // Use next direction if set
     if (_nextDirection != null) {
       snakeDirection = _nextDirection!;
@@ -517,6 +520,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
     for (final segment in snakePositions) {
       if (segment['col'] == newCol && segment['row'] == newRow) {
+        gameOver();
         return;
       }
     }
@@ -570,7 +574,60 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  void gameOver() {
+    _isGameOver = true;
+    _moveController?.stop();
+    _snakeTimer?.cancel();
+    _isAnimating = false;
+    _pendingMoves = 0;
+    _nextDirection = null;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Game Over'),
+        content: Text('Your score: $score'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Optionally, reset the game or navigate away
+            },
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _resetGame();
+            },
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _resetGame() {
+    setState(() {
+      _isGameOver = false;
+      score = 0;
+      foodItems.clear();
+      dangerItems.clear();
+      exitItems.clear();
+      snakePositions.clear();
+      _showCountdown = true;
+      _pendingMoves = 0;
+      _nextDirection = null;
+      _isAnimating = false;
+    });
+    if (widget.onScoreChanged != null) {
+      widget.onScoreChanged!(score);
+    }
+    _loadObjects();
+  }
+
   void _onKey(RawKeyEvent event) {
+    if (_isGameOver) return;
     if (event is RawKeyDownEvent) {
       SnakeDirection? newDirection;
       if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
@@ -673,6 +730,11 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         });
         if (widget.onScoreChanged != null) {
           widget.onScoreChanged!(score);
+        }
+        // If snake is only 1 block, game over
+        if (snakePositions.length <= 1) {
+          gameOver();
+          return;
         }
         // Remove blocks from the tail, but keep at least 1 block
         for (int i = 0; i < shrinkLength; i++) {
