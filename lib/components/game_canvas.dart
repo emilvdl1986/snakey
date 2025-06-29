@@ -72,6 +72,18 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   int coins = 0;
 
   bool _isGameOver = false;
+  bool _isLevelComplete = false;
+
+  // Track what was gained in the last level
+  int _lastPointsGained = 0;
+  int _lastCoinsGained = 0;
+  int _lastLivesGained = 0;
+  int currentLevel = 1; // Only used in story mode
+
+  // Track values at the start of each level for gain calculation
+  int _startScore = 0;
+  int _startCoins = 0;
+  int _startLives = 0;
 
   @override
   void initState() {
@@ -688,7 +700,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   // Moves the snake one step in the current direction
   void _snakeMoving() {
-    if (_isGameOver || _isAnimating || snakePositions.isEmpty) return;
+    if (_isGameOver || _isLevelComplete || _isAnimating || snakePositions.isEmpty) return;
     // Use next direction if set
     if (_nextDirection != null) {
       snakeDirection = _nextDirection!;
@@ -902,9 +914,103 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     );
   }
 
+  void gameNext({int? pointsGained, int? coinsGained, int? livesGained}) {
+    _moveController?.stop();
+    _snakeTimer?.cancel();
+    _isAnimating = false;
+    _isLevelComplete = true;
+
+    // Save what was gained for display
+    if (pointsGained != null) _lastPointsGained = pointsGained;
+    if (coinsGained != null) _lastCoinsGained = coinsGained;
+    if (livesGained != null) _lastLivesGained = livesGained;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (context) => Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              color: Colors.transparent,
+              child: Center(
+                child: Container(
+                  width: 340,
+                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Level Complete!',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text('Points x $_lastPointsGained', style: const TextStyle(color: Colors.white, fontSize: 18)),
+                      Text('Coins x $_lastCoinsGained', style: const TextStyle(color: Colors.white, fontSize: 18)),
+                      Text('Lives x $_lastLivesGained', style: const TextStyle(color: Colors.white, fontSize: 18)),
+                      const SizedBox(height: 32),
+                      if (widget.mode == "story") ...[
+                        Button(
+                          label: "Continue",
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            setState(() {
+                              currentLevel += 1;
+                              _isLevelComplete = false;
+                              _showCountdown = true;
+                            });
+                            _resetGame(keepScore: true, keepLives: true, keepCoins: true, nextLevel: true);
+                          },
+                        ),
+                      ] else ...[
+                        Button(
+                          label: "Continue",
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            setState(() {
+                              _isLevelComplete = false;
+                              _showCountdown = true;
+                            });
+                            _resetGame(keepScore: true, keepLives: true, keepCoins: true);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Button(
+                          label: "Restart",
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            setState(() {
+                              _isLevelComplete = false;
+                              _showCountdown = true;
+                            });
+                            _resetGame();
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _respawnSnake() {
     setState(() {
       _isGameOver = false;
+      _isLevelComplete = false;
       foodItems.clear();
       dangerItems.clear();
       exitItems.clear();
@@ -918,6 +1024,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       _isAnimating = false;
     });
     _loadObjects();
+    _onLevelStart();
     // Do not reset score or livesLeft
     if (widget.onScoreChanged != null) {
       widget.onScoreChanged!(score);
@@ -927,11 +1034,17 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     }
   }
 
-  void _resetGame() {
+  void _resetGame({
+    bool keepScore = false,
+    bool keepLives = false,
+    bool keepCoins = false,
+    bool nextLevel = false,
+  }) {
     setState(() {
-      _isGameOver = false;
-      score = 0;
-      livesLeft = 3;
+      if (!keepScore) score = 0;
+      if (!keepLives) livesLeft = 3;
+      if (!keepCoins) coins = 0;
+      if (nextLevel) currentLevel += 1;
       foodItems.clear();
       dangerItems.clear();
       exitItems.clear();
@@ -939,55 +1052,41 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       heartItems.clear();
       coinItems.clear();
       keyItems.clear();
+      _isGameOver = false;
+      _isLevelComplete = false;
       _showCountdown = true;
       _pendingMoves = 0;
       _nextDirection = null;
       _isAnimating = false;
     });
-    if (widget.onScoreChanged != null) {
-      widget.onScoreChanged!(score);
-    }
-    if (widget.onLivesChanged != null) {
-      widget.onLivesChanged!(livesLeft);
-    }
     _loadObjects();
+    _onLevelStart();
+    if (widget.onScoreChanged != null) widget.onScoreChanged!(score);
+    if (widget.onLivesChanged != null) widget.onLivesChanged!(livesLeft);
+    if (widget.onCoinsChanged != null) widget.onCoinsChanged!(coins);
   }
 
-  void _onKey(RawKeyEvent event) {
-    if (_isGameOver) return;
-    if (event is RawKeyDownEvent) {
-      SnakeDirection? newDirection;
-      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-        newDirection = SnakeDirection.up;
-      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-        newDirection = SnakeDirection.down;
-      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-        newDirection = SnakeDirection.left;
-      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-        newDirection = SnakeDirection.right;
-      }
-      if (newDirection != null) {
-        // Prevent reversing direction
-        if ((snakeDirection == SnakeDirection.up && newDirection == SnakeDirection.down) ||
-            (snakeDirection == SnakeDirection.down && newDirection == SnakeDirection.up) ||
-            (snakeDirection == SnakeDirection.left && newDirection == SnakeDirection.right) ||
-            (snakeDirection == SnakeDirection.right && newDirection == SnakeDirection.left)) {
-          return;
-        }
-        _nextDirection = newDirection;
-      }
-    }
+  // Track values at the start of each level for gain calculation
+  void _startLevelTracking() {
+    _startScore = score;
+    _startCoins = coins;
+    _startLives = livesLeft;
   }
 
-  void _onCountdownFinished() {
-    setState(() {
-      _showCountdown = false;
-    });
-    _startSnakeMoving();
+  // Call this after respawn/reset/next level
+  void _onLevelStart() {
+    _startLevelTracking();
   }
 
-  /// Triggers a custom action based on the object the snake interacts with.
-  /// You can expand this to handle different object types or properties.
+  // Call this when exit is reached
+  void _onExitReached() {
+    final int pointsGained = score - _startScore;
+    final int coinsGained = coins - _startCoins;
+    final int livesGained = livesLeft - _startLives;
+    gameNext(pointsGained: pointsGained, coinsGained: coinsGained, livesGained: livesGained);
+  }
+
+  // Restore triggerObjectAction method
   void triggerObjectAction(Map<String, dynamic> object, {int? col, int? row}) {
     if (object['type'] == 'food') {
       debugPrint('Food eaten! \\${object['action']}');
@@ -1154,10 +1253,45 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       }
     } else if (object['type'] == 'exit') {
       debugPrint('Exit reached!');
-      // TODO: Implement exit logic
+      _onExitReached();
     } else {
       debugPrint('Unknown object type: \\${object['type']}');
     }
+  }
+
+  // Restore _onKey method
+  void _onKey(RawKeyEvent event) {
+    if (_isGameOver || _isLevelComplete) return;
+    if (event is RawKeyDownEvent) {
+      SnakeDirection? newDirection;
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        newDirection = SnakeDirection.up;
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        newDirection = SnakeDirection.down;
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+        newDirection = SnakeDirection.left;
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+        newDirection = SnakeDirection.right;
+      }
+      if (newDirection != null) {
+        // Prevent reversing direction
+        if ((snakeDirection == SnakeDirection.up && newDirection == SnakeDirection.down) ||
+            (snakeDirection == SnakeDirection.down && newDirection == SnakeDirection.up) ||
+            (snakeDirection == SnakeDirection.left && newDirection == SnakeDirection.right) ||
+            (snakeDirection == SnakeDirection.right && newDirection == SnakeDirection.left)) {
+          return;
+        }
+        _nextDirection = newDirection;
+      }
+    }
+  }
+
+  // Restore _onCountdownFinished method
+  void _onCountdownFinished() {
+    setState(() {
+      _showCountdown = false;
+    });
+    _startSnakeMoving();
   }
 
   @override
