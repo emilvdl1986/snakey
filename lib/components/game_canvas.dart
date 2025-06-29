@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:snakey/components/count_down.dart';
+import 'package:snakey/components/button.dart';
 
 enum SnakeDirection { up, down, left, right }
 
@@ -815,31 +816,86 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Game Over'),
-        content: Text('Your score: $score'),
-        actions: [
-          if (livesLeft > 0)
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _respawnSnake();
-              },
-              child: const Text('Respawn'),
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (context) => Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              color: Colors.transparent,
+              child: Center(
+                child: Container(
+                  width: 340,
+                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Game Over',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Your score: $score',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Lives left: $livesLeft',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      if (livesLeft > 0)
+                        Button(
+                          label: 'Respawn',
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _respawnSnake();
+                          },
+                        ),
+                      if (livesLeft > 0) const SizedBox(height: 12),
+                      if (livesLeft == 0 && coins >= 3)
+                        Button(
+                          label: 'Respawn (use 3 coins)',
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            setState(() {
+                              coins -= 3;
+                            });
+                            if (widget.onCoinsChanged != null) {
+                              widget.onCoinsChanged!(coins);
+                            }
+                            _respawnSnake();
+                          },
+                          color: Colors.amber,
+                        ),
+                      if (livesLeft == 0 && coins >= 3) const SizedBox(height: 12),
+                      Button(
+                        label: 'Reset',
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _resetGame();
+                        },
+                        color: Colors.red,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Optionally, reset the game or navigate away
-            },
-            child: const Text('OK'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _resetGame();
-            },
-            child: const Text('Reset'),
           ),
         ],
       ),
