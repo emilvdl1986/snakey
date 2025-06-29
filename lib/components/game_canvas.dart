@@ -490,6 +490,26 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       }
     }
 
+    // Check for object at new head position and trigger action if found
+    Map<String, dynamic>? foundFood;
+    final foodMatches = foodItems.where((item) => item['col'] == newCol && item['row'] == newRow).toList();
+    if (foodMatches.isNotEmpty) {
+      foundFood = foodMatches.first;
+      triggerObjectAction(foundFood['object']);
+    }
+    Map<String, dynamic>? foundDanger;
+    final dangerMatches = dangerItems.where((item) => item['col'] == newCol && item['row'] == newRow).toList();
+    if (dangerMatches.isNotEmpty) {
+      foundDanger = dangerMatches.first;
+      triggerObjectAction(foundDanger['object']);
+    }
+    Map<String, dynamic>? foundExit;
+    final exitMatches = exitItems.where((item) => item['col'] == newCol && item['row'] == newRow).toList();
+    if (exitMatches.isNotEmpty) {
+      foundExit = exitMatches.first;
+      triggerObjectAction(foundExit['object']);
+    }
+
     // Animate all segments
     List<Offset> oldOffsets = snakePositions.map((s) => Offset(s['col']!.toDouble(), s['row']!.toDouble())).toList();
     List<Offset> newOffsets = [Offset(newCol.toDouble(), newRow.toDouble())];
@@ -549,6 +569,26 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       _showCountdown = false;
     });
     _startSnakeMoving();
+  }
+
+  /// Triggers a custom action based on the object the snake interacts with.
+  /// You can expand this to handle different object types or properties.
+  void triggerObjectAction(Map<String, dynamic> object) {
+    if (object['type'] == 'food') {
+      // Example: Increase score, grow snake, play sound, etc.
+      debugPrint('Food eaten!');
+      // TODO: Implement food logic
+    } else if (object['type'] == 'danger') {
+      // Example: End game, reduce life, play sound, etc.
+      debugPrint('Danger hit!');
+      // TODO: Implement danger logic
+    } else if (object['type'] == 'exit') {
+      // Example: Complete level, show dialog, etc.
+      debugPrint('Exit reached!');
+      // TODO: Implement exit logic
+    } else {
+      debugPrint('Unknown object type: \\${object['type']}');
+    }
   }
 
   @override
