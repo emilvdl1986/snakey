@@ -5,10 +5,11 @@
         "rows":10,
         "backgroundColor":"blue",
         "backgroundImage":false,
+        "end":true,
         "gridItemOptions":{
             "backgroundCoverColor":false,
             "backgroundCoverImage":"floor-grass.jpg",
-            "foodLimit":100,
+            "foodLimit":25,
             "foodTrigger":true,
             "dangerItemsLimit":2,
             "exitItemsLimit":1,

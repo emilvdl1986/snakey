@@ -23,6 +23,7 @@ class _GameScreenState extends State<GameScreen> {
   int livesLeft = 3;
   int coins = 0;
   int currentLevel = 1; // LIFTED STATE
+  bool isFinalStage = false;
 
   @override
   void initState() {
@@ -39,6 +40,7 @@ class _GameScreenState extends State<GameScreen> {
           data = loadedData;
           gridSettings = loadedData['gridSettings'] as Map<String, dynamic>?;
           isLoading = false;
+          isFinalStage = false;
         });
       } else if (widget.mode == 'story') {
         // Load story.json for title and appBarSettings
@@ -47,11 +49,16 @@ class _GameScreenState extends State<GameScreen> {
         // Load stage json for gridSettings
         final String stageJson = await rootBundle.loadString('assets/stages/$currentLevel.json');
         final Map<String, dynamic> loadedStage = json.decode(stageJson);
+        bool finalStage = false;
+        if (loadedStage['gridSettings'] != null && loadedStage['gridSettings']['end'] == true) {
+          finalStage = true;
+        }
         setState(() {
           storyData = loadedStory;
           data = loadedStory;
           gridSettings = loadedStage['gridSettings'] as Map<String, dynamic>?;
           isLoading = false;
+          isFinalStage = finalStage;
         });
       }
     } catch (e) {
@@ -71,10 +78,15 @@ class _GameScreenState extends State<GameScreen> {
       try {
         final String stageJson = await rootBundle.loadString('assets/stages/$newLevel.json');
         final Map<String, dynamic> loadedStage = json.decode(stageJson);
+        bool finalStage = false;
+        if (loadedStage['gridSettings'] != null && loadedStage['gridSettings']['end'] == true) {
+          finalStage = true;
+        }
         setState(() {
           currentLevel = newLevel;
           gridSettings = loadedStage['gridSettings'] as Map<String, dynamic>?;
           isLoading = false;
+          isFinalStage = finalStage;
         });
       } catch (e) {
         setState(() {
@@ -137,6 +149,7 @@ class _GameScreenState extends State<GameScreen> {
                         },
                         currentLevel: currentLevel,
                         onLevelChanged: _handleLevelChanged,
+                        isFinalStage: isFinalStage,
                       ),
                     )
                   : const Center(child: Text('Grid settings not found'))),

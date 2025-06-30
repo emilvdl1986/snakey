@@ -22,6 +22,7 @@ class GameCanvas extends StatefulWidget {
   final ValueChanged<int>? onCoinsChanged;
   final int currentLevel;
   final ValueChanged<int>? onLevelChanged;
+  final bool isFinalStage;
 
   const GameCanvas({
     super.key,
@@ -37,6 +38,7 @@ class GameCanvas extends StatefulWidget {
     this.onCoinsChanged,
     required this.currentLevel,
     this.onLevelChanged,
+    this.isFinalStage = false,
   });
 
   @override
@@ -941,6 +943,69 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     if (coinsGained != null) _lastCoinsGained = coinsGained;
     if (livesGained != null) _lastLivesGained = livesGained;
 
+    if (widget.mode == "story" && (widget.isFinalStage == true)) {
+      // Calculate total score and update top scores before showing dialog
+      final int totalScore = calculateTotalScore();
+      _updateTopScores(totalScore);
+      // Show Game Complete dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withOpacity(0.7),
+        builder: (context) => Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                color: Colors.transparent,
+                child: Center(
+                  child: Container(
+                    width: 340,
+                    padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Game Complete!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Congrats! You have completed the story games.',
+                          style: TextStyle(color: Colors.white, fontSize: 20),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Total Score: ' + totalScore.toString(),
+                          style: const TextStyle(color: Colors.amber, fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 32),
+                        Button(
+                          label: "Back to Home",
+                          onPressed: () {
+                            Navigator.of(context).popUntil((route) => route.isFirst);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -998,19 +1063,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
                               _isLevelComplete = false;
                               _showCountdown = true;
                             });
-                            _resetGame(keepScore: true, keepLives: true, keepCoins: true);
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        Button(
-                          label: "Restart",
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            setState(() {
-                              _isLevelComplete = false;
-                              _showCountdown = true;
-                            });
-                            _resetGame();
+                            _resetGame(nextLevel: true);
                           },
                         ),
                       ],
