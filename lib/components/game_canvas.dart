@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:snakey/components/count_down.dart';
 import 'package:snakey/components/button.dart';
+import '../components/local_storage_service.dart';
 
 enum SnakeDirection { up, down, left, right }
 
@@ -816,6 +817,18 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  void _updateTopScores(int newScore) async {
+    final scoresString = await LocalStorageService.getString('top_scores');
+    List<int> scores = [];
+    if (scoresString != null && scoresString.isNotEmpty) {
+      scores = scoresString.split(',').map((e) => int.tryParse(e) ?? 0).toList();
+    }
+    scores.add(newScore);
+    scores.sort((a, b) => b.compareTo(a)); // Descending
+    if (scores.length > 10) scores = scores.sublist(0, 10);
+    await LocalStorageService.setString('top_scores', scores.join(','));
+  }
+
   void gameOver() {
     _isGameOver = true;
     livesLeft = (livesLeft > 0) ? livesLeft - 1 : 0;
@@ -901,6 +914,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
                         label: 'Reset',
                         onPressed: () {
                           Navigator.of(context).pop();
+                          _updateTopScores(score); // Update top scores on reset
                           _resetGame();
                         },
                         color: Colors.red,
@@ -1087,6 +1101,16 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     final int coinsGained = coins - _startCoins;
     final int livesGained = livesLeft - _startLives;
     gameNext(pointsGained: pointsGained, coinsGained: coinsGained, livesGained: livesGained);
+  }
+
+  /// Calculates the total score based on the game mode.
+  int calculateTotalScore() {
+    if (widget.mode == 'endless') {
+      return score * (coins > 0 ? coins : 1);
+    } else if (widget.mode == 'story') {
+      return score * (coins > 0 ? coins : 1) * (widget.currentLevel > 0 ? widget.currentLevel : 1);
+    }
+    return score;
   }
 
   // Restore triggerObjectAction method
@@ -1295,6 +1319,14 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       _showCountdown = false;
     });
     _startSnakeMoving();
+  }
+
+  /// Returns the highest score from a list of scores, or the current score if no list is provided.
+  int calculateTopScore([List<int>? previousScores]) {
+    if (previousScores == null || previousScores.isEmpty) {
+      return score;
+    }
+    return [score, ...previousScores].reduce((a, b) => a > b ? a : b);
   }
 
   @override

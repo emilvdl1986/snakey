@@ -44,6 +44,15 @@ class HomeScreen extends StatelessWidget {
                   type: ButtonType.outlined,
                   onPressed: () => _navigateToGame(context, 'endless'),
                 ),
+                const SizedBox(height: 20),
+                Button(
+                  label: 'Top Scores',
+                  icon: Icons.leaderboard,
+                  type: ButtonType.filled,
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/top-scores');
+                  },
+                ),
               ],
             ),
           ),
