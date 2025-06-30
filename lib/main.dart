@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'screens/home_screen.dart';
+import 'screens/top_scores.dart';
 
 void main() {
   runApp(const MyApp());
@@ -9,12 +11,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello, Flutter!'),
-        ),
-      ),
+    return MaterialApp(
+      home: const HomeScreen(),
+      routes: {
+        '/top-scores': (context) => const TopScores(),
+      },
     );
   }
 }
