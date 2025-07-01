@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../components/game_app_bar.dart';
 import '../components/game_canvas.dart';
+import '../components/local_storage_service.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 
 class GameScreen extends StatefulWidget {
   final String mode;
-  const GameScreen({super.key, required this.mode});
+  final bool resume;
+  const GameScreen({super.key, required this.mode, this.resume = false});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -16,6 +18,7 @@ class _GameScreenState extends State<GameScreen> {
   Map<String, dynamic>? data;
   Map<String, dynamic>? gridSettings;
   Map<String, dynamic>? storyData;
+  Map<String, dynamic>? resumeState;
   bool isLoading = true;
   String? error;
   int stage = 1;
@@ -28,7 +31,57 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    _loadGameType();
+    if (widget.resume) {
+      _loadResumeGame();
+    } else {
+      _loadGameType();
+    }
+  }
+
+  Future<void> _loadResumeGame() async {
+    try {
+      final saved = await LocalStorageService.getString('saved_game');
+      if (saved == null || saved.isEmpty || saved == '{}' || saved == 'null') {
+        setState(() {
+          error = 'No saved game found.';
+          isLoading = false;
+        });
+        return;
+      }
+      // Accept both Map<String, dynamic> and LinkedMap (from json.decode)
+      final dynamic decoded = json.decode(saved);
+      final Map<String, dynamic> savedGame = decoded is Map<String, dynamic>
+          ? decoded
+          : Map<String, dynamic>.from(decoded);
+
+      // Load the original grid settings from asset file
+      Map<String, dynamic> loadedGridSettings = {};
+      if (widget.mode == 'endless') {
+        final String jsonString = await rootBundle.loadString('assets/endless.json');
+        final Map<String, dynamic> loadedData = json.decode(jsonString);
+        loadedGridSettings = loadedData['gridSettings'] as Map<String, dynamic>;
+      } else if (widget.mode == 'story') {
+        final String stageJson = await rootBundle.loadString('assets/stages/${savedGame['level'] ?? 1}.json');
+        final Map<String, dynamic> loadedStage = json.decode(stageJson);
+        loadedGridSettings = loadedStage['gridSettings'] as Map<String, dynamic>;
+      }
+
+      setState(() {
+        resumeState = savedGame;
+        gridSettings = loadedGridSettings;
+        score = savedGame['score'] ?? 0;
+        livesLeft = savedGame['lives'] ?? 3;
+        coins = savedGame['coins'] ?? 0;
+        currentLevel = savedGame['level'] ?? 1;
+        isLoading = false;
+        isFinalStage = false;
+      });
+    } catch (e) {
+      setState(() {
+        error = 'Could not load saved game.';
+        isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadGameType() async {
@@ -130,7 +183,11 @@ class _GameScreenState extends State<GameScreen> {
                         rows: gridSettings!['rows'] ?? 0,
                         backgroundColor: gridSettings!['backgroundColor'],
                         backgroundImage: gridSettings!['backgroundImage'] ?? false,
-                        gridItemOptions: gridSettings!['gridItemOptions'] as Map<String, dynamic>?,
+                        gridItemOptions: gridSettings!['gridItemOptions'] is Map<String, dynamic>
+                            ? gridSettings!['gridItemOptions'] as Map<String, dynamic>
+                            : gridSettings!['gridItemOptions'] != null
+                                ? Map<String, dynamic>.from(gridSettings!['gridItemOptions'])
+                                : null,
                         mode: widget.mode,
                         onScoreChanged: (newScore) {
                           setState(() {
@@ -150,6 +207,7 @@ class _GameScreenState extends State<GameScreen> {
                         currentLevel: currentLevel,
                         onLevelChanged: _handleLevelChanged,
                         isFinalStage: isFinalStage,
+                        resumeState: resumeState,
                       ),
                     )
                   : const Center(child: Text('Grid settings not found'))),
