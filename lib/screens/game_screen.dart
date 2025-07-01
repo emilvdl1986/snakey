@@ -19,6 +19,7 @@ class _GameScreenState extends State<GameScreen> {
   Map<String, dynamic>? gridSettings;
   Map<String, dynamic>? storyData;
   Map<String, dynamic>? resumeState;
+  List<dynamic>? objectDefinitions;
   bool isLoading = true;
   String? error;
   int stage = 1;
@@ -56,19 +57,27 @@ class _GameScreenState extends State<GameScreen> {
 
       // Load the original grid settings from asset file
       Map<String, dynamic> loadedGridSettings = {};
+      List<dynamic>? loadedObjects;
       if (widget.mode == 'endless') {
         final String jsonString = await rootBundle.loadString('assets/endless.json');
         final Map<String, dynamic> loadedData = json.decode(jsonString);
         loadedGridSettings = loadedData['gridSettings'] as Map<String, dynamic>;
+        // Load endless objects
+        final String objectsJson = await rootBundle.loadString('assets/objects/endless_objects.json');
+        loadedObjects = json.decode(objectsJson) as List<dynamic>;
       } else if (widget.mode == 'story') {
         final String stageJson = await rootBundle.loadString('assets/stages/${savedGame['level'] ?? 1}.json');
         final Map<String, dynamic> loadedStage = json.decode(stageJson);
         loadedGridSettings = loadedStage['gridSettings'] as Map<String, dynamic>;
+        // Load story objects
+        final String objectsJson = await rootBundle.loadString('assets/objects/story_objects.json');
+        loadedObjects = json.decode(objectsJson) as List<dynamic>;
       }
 
       setState(() {
         resumeState = savedGame;
         gridSettings = loadedGridSettings;
+        objectDefinitions = loadedObjects;
         score = savedGame['score'] ?? 0;
         livesLeft = savedGame['lives'] ?? 3;
         coins = savedGame['coins'] ?? 0;
@@ -208,6 +217,7 @@ class _GameScreenState extends State<GameScreen> {
                         onLevelChanged: _handleLevelChanged,
                         isFinalStage: isFinalStage,
                         resumeState: resumeState,
+                        objectDefinitions: objectDefinitions,
                       ),
                     )
                   : const Center(child: Text('Grid settings not found'))),

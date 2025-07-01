@@ -26,6 +26,9 @@ class GameCanvas extends StatefulWidget {
 
   final Map<String, dynamic>? resumeState;
 
+  // Add objectDefinitions prop
+  final List<dynamic>? objectDefinitions;
+
   const GameCanvas({
     super.key,
     required this.columns,
@@ -42,6 +45,7 @@ class GameCanvas extends StatefulWidget {
     this.onLevelChanged,
     this.isFinalStage = false,
     this.resumeState,
+    this.objectDefinitions,
   });
 
   @override
@@ -49,6 +53,16 @@ class GameCanvas extends StatefulWidget {
 }
 
 class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMixin {
+  // Ensures that if all keys are collected and no exit exists, exits are generated
+  void _ensureExitIfKeysCollected() {
+    if (keyItems.isEmpty && exitItems.isEmpty && objects != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && keyItems.isEmpty && exitItems.isEmpty && objects != null) {
+          _generateRandomExitItems();
+        }
+      });
+    }
+  }
   List<dynamic>? objects;
   bool isLoadingObjects = true;
   List<Map<String, dynamic>> foodItems = [];
@@ -96,8 +110,14 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    if (widget.resumeState != null) {
-      // Accept both Map<String, dynamic> and LinkedMap (from json.decode)
+    // If objectDefinitions are provided (from resume), use them immediately
+    if (widget.objectDefinitions != null) {
+      objects = widget.objectDefinitions;
+    }
+    // Only restore from resumeState if not moving to next level or after game over
+    // Use local state, not widget, for isLevelComplete and isGameOver
+    if (widget.resumeState != null && !_isLevelComplete && !_isGameOver) {
+      // Only restore from resumeState if not moving to next level or after game over
       final dynamic stateRaw = widget.resumeState;
       final Map<String, dynamic> state = stateRaw is Map<String, dynamic>
           ? stateRaw
@@ -127,12 +147,13 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
             ? Map<String, dynamic>.from(state['snakeSettings'])
             : {};
       }
-      _showCountdown = false;
+      // (No exit generation here; defer to _loadObjects after objects are loaded)
+      _showCountdown = true;
       _setupAnimationController();
       isLoadingObjects = false;
-      // No need to clear saved game here
+      // Do NOT start snake movement here; let the countdown handle it
     } else {
-      // On new game, clear previous save and create a new one
+      // On new game, reset, respawn, or next level, always start fresh
       SavedGameStorage.clear().then((_) {
         _saveGameStateToLocalStorage();
       });
@@ -377,12 +398,27 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         objects = json.decode(objectsJson);
         isLoadingObjects = false;
       });
+      // Always clear all item lists before generating new ones
+      foodItems.clear();
+      dangerItems.clear();
+      exitItems.clear();
+      heartItems.clear();
+      coinItems.clear();
+      keyItems.clear();
       _generateRandomFoodItems();
       _generateRandomDangerItems();
       _generateRandomHeartItems();
       _generateRandomCoinItems();
       _generateRandomKeyItems();
-      // _generateRandomExitItems(); // Do not spawn exits at the beginning
+
+      // --- GUARANTEED EXIT GENERATION AFTER RESUME (objects loaded) ---
+      if (keyItems.isEmpty && exitItems.isEmpty) {
+        setState(() {
+          _generateRandomExitItems();
+        });
+        _saveGameStateToLocalStorage();
+      }
+
       _loadSnake(); // Load snake after all items are placed
       _saveGameStateToLocalStorage(); // Save after all objects are loaded
     } catch (e) {
@@ -864,6 +900,9 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       triggerObjectAction(foundKey['object'], col: newCol, row: newRow);
     }
 
+    // Ensure exit is generated after every move if all keys are collected
+    _ensureExitIfKeysCollected();
+
     // Animate all segments
     List<Offset> oldOffsets = snakePositions.map((s) => Offset(s['col']!.toDouble(), s['row']!.toDouble())).toList();
     List<Offset> newOffsets = [Offset(newCol.toDouble(), newRow.toDouble())];
@@ -1169,6 +1208,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       _nextDirection = null;
       _isAnimating = false;
     });
+    // Always reload objects after respawn, even after resume
     _loadObjects();
     _onLevelStart();
     // Do not reset score or livesLeft
@@ -1205,6 +1245,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       _nextDirection = null;
       _isAnimating = false;
     });
+    // Always reload objects after reset, even after resume
     _loadObjects();
     _onLevelStart();
     if (widget.onScoreChanged != null) widget.onScoreChanged!(score);
@@ -1245,7 +1286,44 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   // Restore triggerObjectAction method
   void triggerObjectAction(Map<String, dynamic> object, {int? col, int? row}) {
-    if (object['type'] == 'food') {
+
+    String type = (object['type']?.toString() ?? '').replaceAll(RegExp(r'[\\/]'), '').trim().toLowerCase();
+
+    // --- ATOMIC KEY COLLECTION AND EXIT GENERATION ---
+    if (type == 'key') {
+      debugPrint('Key collected!');
+      bool removed = false;
+      int beforeLen = keyItems.length;
+      if (col != null && row != null) {
+        keyItems.removeWhere((item) => item['col'] == col && item['row'] == row);
+        removed = keyItems.length < beforeLen;
+      }
+      int pointsToAdd = 0;
+      if (object['points'] is int || object['points'] is num) {
+        pointsToAdd = (object['points'] as num).toInt();
+      }
+      // ATOMIC: Remove key, add points, generate exits, update UI in one setState
+      setState(() {
+        score += pointsToAdd;
+        // If all keys are collected and no exits, generate exits synchronously
+        if (keyItems.isEmpty && exitItems.isEmpty && objects != null) {
+          _generateRandomExitItems();
+        }
+        // Respawn key if needed
+        if (keyItems.isEmpty && (widget.gridItemOptions?['keyTrigger'] == true)) {
+          _generateRandomKeyItems();
+        }
+      });
+      if (widget.onScoreChanged != null) {
+        widget.onScoreChanged!(score);
+      }
+      _saveGameStateToLocalStorage();
+      // Remove all post-frame callbacks for exit generation after key collection (no longer needed)
+      return;
+    }
+    // --- END ATOMIC KEY COLLECTION AND EXIT GENERATION ---
+
+    if (type == 'food') {
       debugPrint('Food eaten! \\${object['action']}');
       bool removed = false;
       if (object['action'] == 'grow') {
@@ -1296,7 +1374,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         setState(() {});
       }
       // TODO: Implement other food logic
-    } else if (object['type'] == 'danger') {
+    } else if (type == 'danger') {
       debugPrint('Danger hit!');
       if (object['action'] == 'shrink') {
         int shrinkLength = 1;
@@ -1330,7 +1408,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         setState(() {});
       }
       // TODO: Implement other danger logic
-    } else if (object['type'] == 'heart') {
+    } else if (type == 'heart') {
       debugPrint('Heart collected!');
       bool removed = false;
       // Remove the heart item at the new head position
@@ -1360,16 +1438,15 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       if (heartItems.isEmpty && (widget.gridItemOptions?['heartTrigger'] == true)) {
         _generateRandomHeartItems();
       }
-    } else if (object['type'] == 'key') {
+    } else if (type == 'key') {
       debugPrint('Key collected!');
       bool removed = false;
       // Remove the key item at the new head position
+      int beforeLen = keyItems.length;
       if (col != null && row != null) {
-        final beforeLen = keyItems.length;
         keyItems.removeWhere((item) => item['col'] == col && item['row'] == row);
         removed = keyItems.length < beforeLen;
       }
-      if (removed) setState(() {});
       // Award points if present
       if (object['points'] is int || object['points'] is num) {
         setState(() {
@@ -1379,15 +1456,19 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
           widget.onScoreChanged!(score);
         }
       }
-      // If all keys collected, spawn exits
-      if (keyItems.isEmpty) {
-        _generateRandomExitItems();
+      // Only check for exit generation if a key was actually removed
+      if (removed) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _ensureExitIfKeysCollected();
+          }
+        });
       }
       // Respawn key if needed
       if (keyItems.isEmpty && (widget.gridItemOptions?['keyTrigger'] == true)) {
         _generateRandomKeyItems();
       }
-    } else if (object['type'] == 'coin') {
+    } else if (type == 'coin') {
       debugPrint('Coin collected!');
       bool removed = false;
       // Remove the coin item at the new head position
@@ -1408,7 +1489,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       if (coinItems.isEmpty && (widget.gridItemOptions?['coinTrigger'] == true)) {
         _generateRandomCoinItems();
       }
-    } else if (object['type'] == 'exit') {
+    } else if (type == 'exit') {
       debugPrint('Exit reached!');
       _onExitReached();
     } else {
@@ -1484,6 +1565,10 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    // As a last resort, ensure exit is generated if all keys are collected (guarded to avoid infinite loop)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ensureExitIfKeysCollected();
+    });
     final double screenWidth = MediaQuery.of(context).size.width - (widget.padding * 2);
     final double cellSize = screenWidth / widget.columns;
     final double gridHeight = cellSize * widget.rows;
