@@ -53,6 +53,7 @@ class GameCanvas extends StatefulWidget {
 }
 
 class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMixin {
+  String? _resumeMode;
   // Ensures that if all keys are collected and no exit exists, exits are generated
   void _ensureExitIfKeysCollected() {
     if (keyItems.isEmpty && exitItems.isEmpty && objects != null) {
@@ -117,11 +118,14 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     // Only restore from resumeState if not moving to next level or after game over
     // Use local state, not widget, for isLevelComplete and isGameOver
     if (widget.resumeState != null && !_isLevelComplete && !_isGameOver) {
-      // Only restore from resumeState if not moving to next level or after game over
       final dynamic stateRaw = widget.resumeState;
       final Map<String, dynamic> state = stateRaw is Map<String, dynamic>
           ? stateRaw
           : Map<String, dynamic>.from(stateRaw);
+      // Use mode from resumeState if present
+      if (state['gameMode'] != null) {
+        _resumeMode = state['gameMode'];
+      }
       // Restore basic game state
       score = state['score'] ?? 0;
       livesLeft = state['lives'] ?? 3;
@@ -1543,10 +1547,12 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   /// Save the current game state to local storage for resume functionality.
   Future<void> _saveGameStateToLocalStorage() async {
+    // Always use the mode from resumeState if present, else widget.mode
+    final String modeToSave = _resumeMode ?? widget.mode;
     final Map<String, dynamic> gameState = {
-      'gameMode': widget.mode,
+      'gameMode': modeToSave,
       'score': score,
-      'level': widget.mode == 'story' ? widget.currentLevel : null,
+      'level': modeToSave == 'story' ? widget.currentLevel : null,
       'coins': coins,
       'lives': livesLeft,
       'snakePositions': List<Map<String, int>>.from(snakePositions),

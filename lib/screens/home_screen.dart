@@ -3,6 +3,7 @@ import '../components/logo.dart';
 import '../components/button.dart';
 import 'game_screen.dart';
 import '../components/local_storage_service.dart';
+import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -53,12 +54,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 Logo(size: 300),
                 const SizedBox(height: 40),
                 if (_hasSavedGame) ...[
-                  Button(
-                    label: 'Continue',
-                    icon: Icons.play_arrow,
-                    type: ButtonType.filled,
-                    color: Colors.black,
-                    onPressed: () => _navigateToGame(context, 'story', resume: true),
+                  FutureBuilder<String?>(
+                    future: LocalStorageService.getString('saved_game'),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data == null || snapshot.data == '{}' || snapshot.data == 'null') {
+                        return const SizedBox.shrink();
+                      }
+                      String mode = 'story';
+                      try {
+                        final dynamic decoded = snapshot.data != null ? jsonDecode(snapshot.data!) : null;
+                        if (decoded != null && decoded is Map && decoded['gameMode'] != null) {
+                          mode = decoded['gameMode'];
+                        }
+                      } catch (_) {}
+                      return Button(
+                        label: 'Continue',
+                        icon: Icons.play_arrow,
+                        type: ButtonType.filled,
+                        color: Colors.black,
+                        onPressed: () => _navigateToGame(context, mode, resume: true),
+                      );
+                    },
                   ),
                   const SizedBox(height: 20),
                 ],

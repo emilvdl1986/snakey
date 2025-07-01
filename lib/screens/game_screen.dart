@@ -28,6 +28,7 @@ class _GameScreenState extends State<GameScreen> {
   int coins = 0;
   int currentLevel = 1; // LIFTED STATE
   bool isFinalStage = false;
+  String? _resumeMode; // Track mode from saved game if resuming
 
   @override
   void initState() {
@@ -55,17 +56,21 @@ class _GameScreenState extends State<GameScreen> {
           ? decoded
           : Map<String, dynamic>.from(decoded);
 
+      // Use the mode from the saved game if present
+      final String savedMode = savedGame['gameMode'] ?? widget.mode;
+      _resumeMode = savedMode;
+
       // Load the original grid settings from asset file
       Map<String, dynamic> loadedGridSettings = {};
       List<dynamic>? loadedObjects;
-      if (widget.mode == 'endless') {
+      if (savedMode == 'endless') {
         final String jsonString = await rootBundle.loadString('assets/endless.json');
         final Map<String, dynamic> loadedData = json.decode(jsonString);
         loadedGridSettings = loadedData['gridSettings'] as Map<String, dynamic>;
         // Load endless objects
         final String objectsJson = await rootBundle.loadString('assets/objects/endless_objects.json');
         loadedObjects = json.decode(objectsJson) as List<dynamic>;
-      } else if (widget.mode == 'story') {
+      } else if (savedMode == 'story') {
         final String stageJson = await rootBundle.loadString('assets/stages/${savedGame['level'] ?? 1}.json');
         final Map<String, dynamic> loadedStage = json.decode(stageJson);
         loadedGridSettings = loadedStage['gridSettings'] as Map<String, dynamic>;
@@ -197,7 +202,7 @@ class _GameScreenState extends State<GameScreen> {
                             : gridSettings!['gridItemOptions'] != null
                                 ? Map<String, dynamic>.from(gridSettings!['gridItemOptions'])
                                 : null,
-                        mode: widget.mode,
+                        mode: widget.resume && _resumeMode != null ? _resumeMode! : widget.mode,
                         onScoreChanged: (newScore) {
                           setState(() {
                             score = newScore;
