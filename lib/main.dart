@@ -13,6 +13,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: const HomeScreen(),
+      navigatorObservers: [routeObserver],
       routes: {
         '/top-scores': (context) => const TopScores(),
       },

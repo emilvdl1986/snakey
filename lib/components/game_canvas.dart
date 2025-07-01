@@ -24,6 +24,11 @@ class GameCanvas extends StatefulWidget {
   final ValueChanged<int>? onLevelChanged;
   final bool isFinalStage;
 
+  final Map<String, dynamic>? resumeState;
+
+  // Add objectDefinitions prop
+  final List<dynamic>? objectDefinitions;
+
   const GameCanvas({
     super.key,
     required this.columns,
@@ -39,6 +44,8 @@ class GameCanvas extends StatefulWidget {
     required this.currentLevel,
     this.onLevelChanged,
     this.isFinalStage = false,
+    this.resumeState,
+    this.objectDefinitions,
   });
 
   @override
@@ -46,6 +53,17 @@ class GameCanvas extends StatefulWidget {
 }
 
 class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMixin {
+  String? _resumeMode;
+  // Ensures that if all keys are collected and no exit exists, exits are generated
+  void _ensureExitIfKeysCollected() {
+    if (keyItems.isEmpty && exitItems.isEmpty && objects != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && keyItems.isEmpty && exitItems.isEmpty && objects != null) {
+          _generateRandomExitItems();
+        }
+      });
+    }
+  }
   List<dynamic>? objects;
   bool isLoadingObjects = true;
   List<Map<String, dynamic>> foodItems = [];
@@ -93,24 +111,96 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    // Set random initial direction
-    final directions = SnakeDirection.values;
-    snakeDirection = directions[Random().nextInt(directions.length)];
-    // Always load speed from snakeSettings in JSON (unless overridden elsewhere)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final settings = widget.gridItemOptions?['snakeSettings'] ?? (widget.gridItemOptions?['snakeSettings'] ?? {});
-      if (settings != null && settings['speed'] != null) {
-        setState(() {
-          _snakeSpeed = settings['speed'];
-        });
-      } else if (widget.gridItemOptions?['speed'] != null) {
-        setState(() {
-          _snakeSpeed = widget.gridItemOptions!['speed'];
-        });
+    // If objectDefinitions are provided (from resume), use them immediately
+    if (widget.objectDefinitions != null) {
+      objects = widget.objectDefinitions;
+    }
+    // Only restore from resumeState if not moving to next level or after game over
+    // Use local state, not widget, for isLevelComplete and isGameOver
+    if (widget.resumeState != null && !_isLevelComplete && !_isGameOver) {
+      final dynamic stateRaw = widget.resumeState;
+      final Map<String, dynamic> state = stateRaw is Map<String, dynamic>
+          ? stateRaw
+          : Map<String, dynamic>.from(stateRaw);
+      // Use mode from resumeState if present
+      if (state['gameMode'] != null) {
+        _resumeMode = state['gameMode'];
       }
+      // Restore basic game state
+      score = state['score'] ?? 0;
+      livesLeft = state['lives'] ?? 3;
+      coins = state['coins'] ?? 0;
+      snakeDirection = _snakeDirectionFromString(state['snakeDirection'] ?? 'right');
+      _snakeSpeed = state['snakeSpeed'] ?? 8;
+      // Restore snake positions
+      if (state['snakePositions'] != null) {
+        snakePositions = List<Map<String, int>>.from(
+          (state['snakePositions'] as List).map((e) => Map<String, int>.from(e)),
+        );
+      }
+      // Restore items/objects
+      foodItems = _restoreItemList(state['foodItems']);
+      dangerItems = _restoreItemList(state['dangerItems']);
+      exitItems = _restoreItemList(state['exitItems']);
+      heartItems = _restoreItemList(state['heartItems']);
+      coinItems = _restoreItemList(state['coinItems']);
+      keyItems = _restoreItemList(state['keyItems']);
+      // Restore snakeSettings if present
+      if (state['snakeSettings'] != null) {
+        snakeSettings = state['snakeSettings'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(state['snakeSettings'])
+            : {};
+      }
+      // (No exit generation here; defer to _loadObjects after objects are loaded)
+      _showCountdown = true;
       _setupAnimationController();
-    });
-    _loadObjects();
+      isLoadingObjects = false;
+      // Do NOT start snake movement here; let the countdown handle it
+    } else {
+      // On new game, reset, respawn, or next level, always start fresh
+      // Only clear the saved game on reset, NOT when simply leaving the game screen
+      // (Do not clear here)
+      // Set random initial direction
+      final directions = SnakeDirection.values;
+      snakeDirection = directions[Random().nextInt(directions.length)];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final settings = widget.gridItemOptions?['snakeSettings'] ?? (widget.gridItemOptions?['snakeSettings'] ?? {});
+        if (settings != null && settings['speed'] != null) {
+          setState(() {
+            _snakeSpeed = settings['speed'];
+          });
+        } else if (widget.gridItemOptions?['speed'] != null) {
+          setState(() {
+            _snakeSpeed = widget.gridItemOptions!['speed'];
+          });
+        }
+        _setupAnimationController();
+      });
+      _loadObjects();
+    }
+  }
+
+  // Helper to restore item lists from saved state
+  List<Map<String, dynamic>> _restoreItemList(dynamic list) {
+    if (list == null) return [];
+    return List<Map<String, dynamic>>.from((list as List).map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  // Helper to restore snake direction from string
+  SnakeDirection _snakeDirectionFromString(String dir) {
+    // Accepts both 'up' and 'SnakeDirection.up' and defaults to right
+    if (dir == null) return SnakeDirection.right;
+    final String value = dir.toString();
+    if (value == 'up' || value == 'SnakeDirection.up') return SnakeDirection.up;
+    if (value == 'down' || value == 'SnakeDirection.down') return SnakeDirection.down;
+    if (value == 'left' || value == 'SnakeDirection.left') return SnakeDirection.left;
+    if (value == 'right' || value == 'SnakeDirection.right') return SnakeDirection.right;
+    // Try to match enum string
+    try {
+      return SnakeDirection.values.firstWhere((e) => e.toString() == value || e.name == value);
+    } catch (_) {
+      return SnakeDirection.right;
+    }
   }
 
   void _setupAnimationController() {
@@ -298,6 +388,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       snakePositions = [];
     }
     setState(() {});
+    _saveGameStateToLocalStorage(); // Save after snake is loaded
   }
 
   Future<void> _loadObjects() async {
@@ -310,13 +401,29 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         objects = json.decode(objectsJson);
         isLoadingObjects = false;
       });
+      // Always clear all item lists before generating new ones
+      foodItems.clear();
+      dangerItems.clear();
+      exitItems.clear();
+      heartItems.clear();
+      coinItems.clear();
+      keyItems.clear();
       _generateRandomFoodItems();
       _generateRandomDangerItems();
       _generateRandomHeartItems();
       _generateRandomCoinItems();
       _generateRandomKeyItems();
-      // _generateRandomExitItems(); // Do not spawn exits at the beginning
+
+      // --- GUARANTEED EXIT GENERATION AFTER RESUME (objects loaded) ---
+      if (keyItems.isEmpty && exitItems.isEmpty) {
+        setState(() {
+          _generateRandomExitItems();
+        });
+        _saveGameStateToLocalStorage();
+      }
+
       _loadSnake(); // Load snake after all items are placed
+      _saveGameStateToLocalStorage(); // Save after all objects are loaded
     } catch (e) {
       setState(() {
         objects = null;
@@ -402,6 +509,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       }
     }
     setState(() {});
+    _saveGameStateToLocalStorage(); // Save after food items change
   }
 
   /// Generates random danger items and places them on unoccupied grid positions.
@@ -445,6 +553,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       });
     }
     setState(() {});
+    _saveGameStateToLocalStorage(); // Save after danger items change
   }
 
   /// Generates random exit items and places them on unoccupied grid positions.
@@ -491,6 +600,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       });
     }
     setState(() {});
+    _saveGameStateToLocalStorage(); // Save after exit items change
   }
 
   /// Generates random heart items and places them on unoccupied grid positions.
@@ -552,6 +662,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       }
     }
     setState(() {});
+    _saveGameStateToLocalStorage(); // Save after heart items change
   }
 
   /// Generates random coin items and places them on unoccupied grid positions.
@@ -613,6 +724,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       }
     }
     setState(() {});
+    _saveGameStateToLocalStorage(); // Save after coin items change
   }
 
   /// Generates random key items and places them on unoccupied grid positions.
@@ -674,6 +786,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       }
     }
     setState(() {});
+    _saveGameStateToLocalStorage(); // Save after key items change
   }
 
   Color? _parseColor(String? colorString) {
@@ -790,6 +903,9 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       triggerObjectAction(foundKey['object'], col: newCol, row: newRow);
     }
 
+    // Ensure exit is generated after every move if all keys are collected
+    _ensureExitIfKeysCollected();
+
     // Animate all segments
     List<Offset> oldOffsets = snakePositions.map((s) => Offset(s['col']!.toDouble(), s['row']!.toDouble())).toList();
     List<Offset> newOffsets = [Offset(newCol.toDouble(), newRow.toDouble())];
@@ -801,6 +917,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     _segmentNewOffsets = newOffsets;
     _pendingNewHead = {'col': newCol, 'row': newRow};
     _moveController!.forward(from: 0);
+    _saveGameStateToLocalStorage(); // Save after every move
   }
 
   List<Offset>? _segmentOldOffsets;
@@ -990,7 +1107,9 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
                         const SizedBox(height: 32),
                         Button(
                           label: "Back to Home",
-                          onPressed: () {
+                          onPressed: () async {
+                            // Clear saved game when returning to home after completion
+                            await SavedGameStorage.clear();
                             Navigator.of(context).popUntil((route) => route.isFirst);
                           },
                         ),
@@ -1063,7 +1182,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
                               _isLevelComplete = false;
                               _showCountdown = true;
                             });
-                            _resetGame(nextLevel: true);
+                            _respawnSnake();
                           },
                         ),
                       ],
@@ -1094,6 +1213,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       _nextDirection = null;
       _isAnimating = false;
     });
+    // Always reload objects after respawn, even after resume
     _loadObjects();
     _onLevelStart();
     // Do not reset score or livesLeft
@@ -1103,6 +1223,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     if (widget.onLivesChanged != null) {
       widget.onLivesChanged!(livesLeft);
     }
+    _saveGameStateToLocalStorage(); // Save after respawn
   }
 
   void _resetGame({
@@ -1129,11 +1250,13 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       _nextDirection = null;
       _isAnimating = false;
     });
+    // Always reload objects after reset, even after resume
     _loadObjects();
     _onLevelStart();
     if (widget.onScoreChanged != null) widget.onScoreChanged!(score);
     if (widget.onLivesChanged != null) widget.onLivesChanged!(livesLeft);
     if (widget.onCoinsChanged != null) widget.onCoinsChanged!(coins);
+    _saveGameStateToLocalStorage(); // Save after reset
   }
 
   // Track values at the start of each level for gain calculation
@@ -1168,7 +1291,44 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
 
   // Restore triggerObjectAction method
   void triggerObjectAction(Map<String, dynamic> object, {int? col, int? row}) {
-    if (object['type'] == 'food') {
+
+    String type = (object['type']?.toString() ?? '').replaceAll(RegExp(r'[\\/]'), '').trim().toLowerCase();
+
+    // --- ATOMIC KEY COLLECTION AND EXIT GENERATION ---
+    if (type == 'key') {
+      debugPrint('Key collected!');
+      bool removed = false;
+      int beforeLen = keyItems.length;
+      if (col != null && row != null) {
+        keyItems.removeWhere((item) => item['col'] == col && item['row'] == row);
+        removed = keyItems.length < beforeLen;
+      }
+      int pointsToAdd = 0;
+      if (object['points'] is int || object['points'] is num) {
+        pointsToAdd = (object['points'] as num).toInt();
+      }
+      // ATOMIC: Remove key, add points, generate exits, update UI in one setState
+      setState(() {
+        score += pointsToAdd;
+        // If all keys are collected and no exits, generate exits synchronously
+        if (keyItems.isEmpty && exitItems.isEmpty && objects != null) {
+          _generateRandomExitItems();
+        }
+        // Respawn key if needed
+        if (keyItems.isEmpty && (widget.gridItemOptions?['keyTrigger'] == true)) {
+          _generateRandomKeyItems();
+        }
+      });
+      if (widget.onScoreChanged != null) {
+        widget.onScoreChanged!(score);
+      }
+      _saveGameStateToLocalStorage();
+      // Remove all post-frame callbacks for exit generation after key collection (no longer needed)
+      return;
+    }
+    // --- END ATOMIC KEY COLLECTION AND EXIT GENERATION ---
+
+    if (type == 'food') {
       debugPrint('Food eaten! \\${object['action']}');
       bool removed = false;
       if (object['action'] == 'grow') {
@@ -1219,7 +1379,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         setState(() {});
       }
       // TODO: Implement other food logic
-    } else if (object['type'] == 'danger') {
+    } else if (type == 'danger') {
       debugPrint('Danger hit!');
       if (object['action'] == 'shrink') {
         int shrinkLength = 1;
@@ -1253,7 +1413,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         setState(() {});
       }
       // TODO: Implement other danger logic
-    } else if (object['type'] == 'heart') {
+    } else if (type == 'heart') {
       debugPrint('Heart collected!');
       bool removed = false;
       // Remove the heart item at the new head position
@@ -1283,34 +1443,8 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       if (heartItems.isEmpty && (widget.gridItemOptions?['heartTrigger'] == true)) {
         _generateRandomHeartItems();
       }
-    } else if (object['type'] == 'key') {
-      debugPrint('Key collected!');
-      bool removed = false;
-      // Remove the key item at the new head position
-      if (col != null && row != null) {
-        final beforeLen = keyItems.length;
-        keyItems.removeWhere((item) => item['col'] == col && item['row'] == row);
-        removed = keyItems.length < beforeLen;
-      }
-      if (removed) setState(() {});
-      // Award points if present
-      if (object['points'] is int || object['points'] is num) {
-        setState(() {
-          score += (object['points'] as num).toInt();
-        });
-        if (widget.onScoreChanged != null) {
-          widget.onScoreChanged!(score);
-        }
-      }
-      // If all keys collected, spawn exits
-      if (keyItems.isEmpty) {
-        _generateRandomExitItems();
-      }
-      // Respawn key if needed
-      if (keyItems.isEmpty && (widget.gridItemOptions?['keyTrigger'] == true)) {
-        _generateRandomKeyItems();
-      }
-    } else if (object['type'] == 'coin') {
+    // ...existing code...
+    } else if (type == 'coin') {
       debugPrint('Coin collected!');
       bool removed = false;
       // Remove the coin item at the new head position
@@ -1331,12 +1465,13 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       if (coinItems.isEmpty && (widget.gridItemOptions?['coinTrigger'] == true)) {
         _generateRandomCoinItems();
       }
-    } else if (object['type'] == 'exit') {
+    } else if (type == 'exit') {
       debugPrint('Exit reached!');
       _onExitReached();
     } else {
       debugPrint('Unknown object type: \\${object['type']}');
     }
+    _saveGameStateToLocalStorage(); // Save after every object action
   }
 
   // Restore _onKey method
@@ -1382,8 +1517,36 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     return [score, ...previousScores].reduce((a, b) => a > b ? a : b);
   }
 
+  /// Save the current game state to local storage for resume functionality.
+  Future<void> _saveGameStateToLocalStorage() async {
+    // Always use the mode from resumeState if present, else widget.mode
+    final String modeToSave = _resumeMode ?? widget.mode;
+    final Map<String, dynamic> gameState = {
+      'gameMode': modeToSave,
+      'score': score,
+      'level': modeToSave == 'story' ? widget.currentLevel : null,
+      'coins': coins,
+      'lives': livesLeft,
+      'snakePositions': List<Map<String, int>>.from(snakePositions),
+      'snakeDirection': snakeDirection.toString(),
+      'snakeLength': snakePositions.length,
+      'foodItems': foodItems.map((item) => Map<String, dynamic>.from(item)).toList(),
+      'dangerItems': dangerItems.map((item) => Map<String, dynamic>.from(item)).toList(),
+      'exitItems': exitItems.map((item) => Map<String, dynamic>.from(item)).toList(),
+      'heartItems': heartItems.map((item) => Map<String, dynamic>.from(item)).toList(),
+      'coinItems': coinItems.map((item) => Map<String, dynamic>.from(item)).toList(),
+      'keyItems': keyItems.map((item) => Map<String, dynamic>.from(item)).toList(),
+      // Add any other relevant state here if needed
+    };
+    await SavedGameStorage.save(gameState);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // As a last resort, ensure exit is generated if all keys are collected (guarded to avoid infinite loop)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ensureExitIfKeysCollected();
+    });
     final double screenWidth = MediaQuery.of(context).size.width - (widget.padding * 2);
     final double cellSize = screenWidth / widget.columns;
     final double gridHeight = cellSize * widget.rows;
@@ -1742,5 +1905,24 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         ),
       ),
     );
+  }
+}
+
+// Add a static helper for saved_game local storage
+class SavedGameStorage {
+  static const String key = 'saved_game';
+
+  static Future<void> save(Map<String, dynamic> gameState) async {
+    await LocalStorageService.setString(key, json.encode(gameState));
+  }
+
+  static Future<Map<String, dynamic>?> load() async {
+    final str = await LocalStorageService.getString(key);
+    if (str == null) return null;
+    return json.decode(str) as Map<String, dynamic>;
+  }
+
+  static Future<void> clear() async {
+    await LocalStorageService.remove(key);
   }
 }
