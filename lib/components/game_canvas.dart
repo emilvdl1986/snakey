@@ -158,9 +158,8 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       // Do NOT start snake movement here; let the countdown handle it
     } else {
       // On new game, reset, respawn, or next level, always start fresh
-      SavedGameStorage.clear().then((_) {
-        _saveGameStateToLocalStorage();
-      });
+      // Only clear the saved game on reset, NOT when simply leaving the game screen
+      // (Do not clear here)
       // Set random initial direction
       final directions = SnakeDirection.values;
       snakeDirection = directions[Random().nextInt(directions.length)];
@@ -1108,7 +1107,9 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
                         const SizedBox(height: 32),
                         Button(
                           label: "Back to Home",
-                          onPressed: () {
+                          onPressed: () async {
+                            // Clear saved game when returning to home after completion
+                            await SavedGameStorage.clear();
                             Navigator.of(context).popUntil((route) => route.isFirst);
                           },
                         ),
@@ -1442,36 +1443,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       if (heartItems.isEmpty && (widget.gridItemOptions?['heartTrigger'] == true)) {
         _generateRandomHeartItems();
       }
-    } else if (type == 'key') {
-      debugPrint('Key collected!');
-      bool removed = false;
-      // Remove the key item at the new head position
-      int beforeLen = keyItems.length;
-      if (col != null && row != null) {
-        keyItems.removeWhere((item) => item['col'] == col && item['row'] == row);
-        removed = keyItems.length < beforeLen;
-      }
-      // Award points if present
-      if (object['points'] is int || object['points'] is num) {
-        setState(() {
-          score += (object['points'] as num).toInt();
-        });
-        if (widget.onScoreChanged != null) {
-          widget.onScoreChanged!(score);
-        }
-      }
-      // Only check for exit generation if a key was actually removed
-      if (removed) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _ensureExitIfKeysCollected();
-          }
-        });
-      }
-      // Respawn key if needed
-      if (keyItems.isEmpty && (widget.gridItemOptions?['keyTrigger'] == true)) {
-        _generateRandomKeyItems();
-      }
+    // ...existing code...
     } else if (type == 'coin') {
       debugPrint('Coin collected!');
       bool removed = false;
