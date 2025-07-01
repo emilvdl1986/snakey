@@ -60,23 +60,37 @@ class _GameScreenState extends State<GameScreen> {
       final String savedMode = savedGame['gameMode'] ?? widget.mode;
       _resumeMode = savedMode;
 
-      // Load the original grid settings from asset file
+      // Load the original grid settings from asset file, and also set data/storyData for app bar
       Map<String, dynamic> loadedGridSettings = {};
       List<dynamic>? loadedObjects;
+      Map<String, dynamic>? loadedData;
+      Map<String, dynamic>? loadedStory;
       if (savedMode == 'endless') {
         final String jsonString = await rootBundle.loadString('assets/endless.json');
-        final Map<String, dynamic> loadedData = json.decode(jsonString);
-        loadedGridSettings = loadedData['gridSettings'] as Map<String, dynamic>;
-        // Load endless objects
+        loadedData = json.decode(jsonString);
+        if (loadedData != null && loadedData['gridSettings'] != null) {
+          loadedGridSettings = loadedData['gridSettings'] as Map<String, dynamic>;
+        } else {
+          loadedGridSettings = {};
+        }
         final String objectsJson = await rootBundle.loadString('assets/objects/endless_objects.json');
         loadedObjects = json.decode(objectsJson) as List<dynamic>;
       } else if (savedMode == 'story') {
+        final String storyJson = await rootBundle.loadString('assets/story.json');
+        loadedStory = json.decode(storyJson);
         final String stageJson = await rootBundle.loadString('assets/stages/${savedGame['level'] ?? 1}.json');
         final Map<String, dynamic> loadedStage = json.decode(stageJson);
-        loadedGridSettings = loadedStage['gridSettings'] as Map<String, dynamic>;
-        // Load story objects
+        if (loadedStage != null && loadedStage['gridSettings'] != null) {
+          loadedGridSettings = loadedStage['gridSettings'] as Map<String, dynamic>;
+        } else {
+          loadedGridSettings = {};
+        }
         final String objectsJson = await rootBundle.loadString('assets/objects/story_objects.json');
         loadedObjects = json.decode(objectsJson) as List<dynamic>;
+        // If this is the final stage, set isFinalStage to true so the popup appears after resume
+        if (loadedStage['gridSettings'] != null && loadedStage['gridSettings']['end'] == true) {
+          isFinalStage = true;
+        }
       }
 
       setState(() {
@@ -88,7 +102,14 @@ class _GameScreenState extends State<GameScreen> {
         coins = savedGame['coins'] ?? 0;
         currentLevel = savedGame['level'] ?? 1;
         isLoading = false;
-        isFinalStage = false;
+        isFinalStage = isFinalStage; // will be true if final stage, else false
+        // Set data and storyData for app bar
+        if (savedMode == 'endless' && loadedData != null) {
+          data = loadedData;
+        } else if (savedMode == 'story' && loadedStory != null) {
+          data = loadedStory;
+          storyData = loadedStory;
+        }
       });
     } catch (e) {
       setState(() {
@@ -138,12 +159,14 @@ class _GameScreenState extends State<GameScreen> {
 
   void _handleLevelChanged(int newLevel) async {
     if (widget.mode == 'story') {
-      // Reload stage file for new level
+      // Check if the next stage file exists before updating level
       setState(() {
         isLoading = true;
       });
       try {
-        final String stageJson = await rootBundle.loadString('assets/stages/$newLevel.json');
+        final String stagePath = 'assets/stages/$newLevel.json';
+        // Try to load the file, if it fails, do not update level
+        final String stageJson = await rootBundle.loadString(stagePath);
         final Map<String, dynamic> loadedStage = json.decode(stageJson);
         bool finalStage = false;
         if (loadedStage['gridSettings'] != null && loadedStage['gridSettings']['end'] == true) {
@@ -154,10 +177,12 @@ class _GameScreenState extends State<GameScreen> {
           gridSettings = loadedStage['gridSettings'] as Map<String, dynamic>?;
           isLoading = false;
           isFinalStage = finalStage;
+          error = null;
         });
       } catch (e) {
+        // If file does not exist, do not update currentLevel, show a message or end the game
         setState(() {
-          error = 'Could not load grid settings for level $newLevel';
+          error = 'No more levels! You have completed all available stages.';
           isLoading = false;
         });
       }

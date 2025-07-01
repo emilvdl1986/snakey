@@ -1181,7 +1181,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
                               _isLevelComplete = false;
                               _showCountdown = true;
                             });
-                            _resetGame(nextLevel: true);
+                            _respawnSnake();
                           },
                         ),
                       ],
