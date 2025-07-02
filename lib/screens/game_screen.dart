@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../components/game_app_bar.dart';
 import '../components/game_canvas.dart';
 import '../components/local_storage_service.dart';
+import '../components/swipe_controller.dart';
+import '../components/swipe_controller.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 
@@ -15,6 +17,11 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
+  final GlobalKey<GameCanvasState> gameCanvasKey = GlobalKey<GameCanvasState>();
+
+  void _sendSwipeDirection(String direction) {
+    SwipeDirectionNotification(direction).dispatch(context);
+  }
   Map<String, dynamic>? data;
   Map<String, dynamic>? gridSettings;
   Map<String, dynamic>? storyData;
@@ -207,7 +214,7 @@ class _GameScreenState extends State<GameScreen> {
         score: score,
         livesLeft: livesLeft,
         coins: coins,
-        currentLevel: currentLevel, // FIXED: was 'level:'
+        currentLevel: currentLevel,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -216,41 +223,63 @@ class _GameScreenState extends State<GameScreen> {
               : (gridSettings != null
                   ? Container(
                       color: Colors.black,
-                      child: GameCanvas(
-                        key: ValueKey(currentLevel), // Force full rebuild on level change
-                        columns: gridSettings!['columns'] ?? 0,
-                        rows: gridSettings!['rows'] ?? 0,
-                        backgroundColor: gridSettings!['backgroundColor'],
-                        backgroundImage: gridSettings!['backgroundImage'] ?? false,
-                        gridItemOptions: gridSettings!['gridItemOptions'] is Map<String, dynamic>
-                            ? gridSettings!['gridItemOptions'] as Map<String, dynamic>
-                            : gridSettings!['gridItemOptions'] != null
-                                ? Map<String, dynamic>.from(gridSettings!['gridItemOptions'])
-                                : null,
-                        mode: widget.resume && _resumeMode != null ? _resumeMode! : widget.mode,
-                        onScoreChanged: (newScore) {
-                          setState(() {
-                            score = newScore;
-                          });
+                      child: NotificationListener<SwipeDirectionNotification>(
+                        onNotification: (notification) {
+                          debugPrint('NotificationListener received swipe: ' + notification.direction);
+                          final state = gameCanvasKey.currentState;
+                          if (state != null && state.mounted) {
+                            state.setDirectionFromSwipe(notification.direction);
+                          }
+                          return true;
                         },
-                        onLivesChanged: (newLives) {
-                          setState(() {
-                            livesLeft = newLives;
-                          });
-                        },
-                        onCoinsChanged: (newCoins) {
-                          setState(() {
-                            coins = newCoins;
-                          });
-                        },
-                        currentLevel: currentLevel,
-                        onLevelChanged: _handleLevelChanged,
-                        isFinalStage: isFinalStage,
-                        resumeState: resumeState,
-                        objectDefinitions: objectDefinitions,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Expanded(
+                              child: GameCanvas(
+                                key: gameCanvasKey,
+                                columns: gridSettings!['columns'] ?? 0,
+                                rows: gridSettings!['rows'] ?? 0,
+                                backgroundColor: gridSettings!['backgroundColor'],
+                                backgroundImage: gridSettings!['backgroundImage'] ?? false,
+                                gridItemOptions: gridSettings!['gridItemOptions'] is Map<String, dynamic>
+                                    ? gridSettings!['gridItemOptions'] as Map<String, dynamic>
+                                    : gridSettings!['gridItemOptions'] != null
+                                        ? Map<String, dynamic>.from(gridSettings!['gridItemOptions'])
+                                        : null,
+                                mode: widget.resume && _resumeMode != null ? _resumeMode! : widget.mode,
+                                onScoreChanged: (newScore) {
+                                  setState(() {
+                                    score = newScore;
+                                  });
+                                },
+                                onLivesChanged: (newLives) {
+                                  setState(() {
+                                    livesLeft = newLives;
+                                  });
+                                },
+                                onCoinsChanged: (newCoins) {
+                                  setState(() {
+                                    coins = newCoins;
+                                  });
+                                },
+                                currentLevel: currentLevel,
+                                onLevelChanged: _handleLevelChanged,
+                                isFinalStage: isFinalStage,
+                                resumeState: resumeState,
+                                objectDefinitions: objectDefinitions,
+                              ),
+                            ),
+                            Builder(
+                              builder: (notificationContext) => SwipeController(notificationContext: notificationContext),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   : const Center(child: Text('Grid settings not found'))),
     );
   }
 }
+
+

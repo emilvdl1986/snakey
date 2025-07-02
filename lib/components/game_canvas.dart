@@ -49,10 +49,51 @@ class GameCanvas extends StatefulWidget {
   });
 
   @override
-  State<GameCanvas> createState() => _GameCanvasState();
+  State<GameCanvas> createState() => GameCanvasState();
 }
 
-class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMixin {
+class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMixin {
+  // Queue for direction changes
+  final List<SnakeDirection> _directionQueue = [];
+
+  // Allow external swipe direction control
+  void setDirectionFromSwipe(String direction) {
+    debugPrint('setDirectionFromSwipe called with: ' + direction);
+    if (_isGameOver || _isLevelComplete) return;
+    SnakeDirection? newDirection;
+    switch (direction) {
+      case 'up':
+        newDirection = SnakeDirection.up;
+        break;
+      case 'down':
+        newDirection = SnakeDirection.down;
+        break;
+      case 'left':
+        newDirection = SnakeDirection.left;
+        break;
+      case 'right':
+        newDirection = SnakeDirection.right;
+        break;
+    }
+    if (newDirection != null) {
+      // Prevent reversing direction (relative to last in queue or current direction)
+      SnakeDirection lastDirection = _directionQueue.isNotEmpty ? _directionQueue.last : snakeDirection;
+      if ((lastDirection == SnakeDirection.up && newDirection == SnakeDirection.down) ||
+          (lastDirection == SnakeDirection.down && newDirection == SnakeDirection.up) ||
+          (lastDirection == SnakeDirection.left && newDirection == SnakeDirection.right) ||
+          (lastDirection == SnakeDirection.right && newDirection == SnakeDirection.left)) {
+        return;
+      }
+      // Only add if not already the last queued direction
+      if (_directionQueue.isEmpty || _directionQueue.last != newDirection) {
+        _directionQueue.add(newDirection);
+      }
+      // Give focus to the RawKeyboardListener so keyboard and swipe can both work
+      if (!_focusNode.hasFocus) {
+        _focusNode.requestFocus();
+      }
+    }
+  }
   String? _resumeMode;
   // Ensures that if all keys are collected and no exit exists, exits are generated
   void _ensureExitIfKeysCollected() {
@@ -166,10 +207,12 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final settings = widget.gridItemOptions?['snakeSettings'] ?? (widget.gridItemOptions?['snakeSettings'] ?? {});
         if (settings != null && settings['speed'] != null) {
+          if (!mounted) return;
           setState(() {
             _snakeSpeed = settings['speed'];
           });
         } else if (widget.gridItemOptions?['speed'] != null) {
+          if (!mounted) return;
           setState(() {
             _snakeSpeed = widget.gridItemOptions!['speed'];
           });
@@ -217,9 +260,11 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       curve: Curves.linear,
     );
     _moveAnimation!.addListener(() {
+      if (!mounted) return;
       setState(() {});
     });
     _moveController!.addStatusListener((status) {
+      if (!mounted) return;
       if (_isGameOver) return;
       if (status == AnimationStatus.completed) {
         _isAnimating = false;
@@ -819,8 +864,11 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   // Moves the snake one step in the current direction
   void _snakeMoving() {
     if (_isGameOver || _isLevelComplete || _isAnimating || snakePositions.isEmpty) return;
-    // Use next direction if set
-    if (_nextDirection != null) {
+    // Use next direction from queue if available
+    if (_directionQueue.isNotEmpty) {
+      snakeDirection = _directionQueue.removeAt(0);
+      _directionQueue.clear(); // Clear any extra queued swipes after applying one
+    } else if (_nextDirection != null) {
       snakeDirection = _nextDirection!;
       _nextDirection = null;
     }
@@ -1232,6 +1280,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
     bool keepCoins = false,
     bool nextLevel = false,
   }) {
+    if (!mounted) return;
     setState(() {
       if (!keepScore) score = 0;
       if (!keepLives) livesLeft = 3;
@@ -1308,6 +1357,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         pointsToAdd = (object['points'] as num).toInt();
       }
       // ATOMIC: Remove key, add points, generate exits, update UI in one setState
+      if (!mounted) return;
       setState(() {
         score += pointsToAdd;
         // If all keys are collected and no exits, generate exits synchronously
@@ -1337,6 +1387,7 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
         if (object['points'] is int) {
           points = object['points'];
         }
+        if (!mounted) return;
         setState(() {
           score += points;
         });
@@ -1443,7 +1494,6 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
       if (heartItems.isEmpty && (widget.gridItemOptions?['heartTrigger'] == true)) {
         _generateRandomHeartItems();
       }
-    // ...existing code...
     } else if (type == 'coin') {
       debugPrint('Coin collected!');
       bool removed = false;
@@ -1505,6 +1555,11 @@ class _GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateM
   void _onCountdownFinished() {
     setState(() {
       _showCountdown = false;
+      // If the user swiped during countdown, use that direction
+      if (_nextDirection != null) {
+        snakeDirection = _nextDirection!;
+        _nextDirection = null;
+      }
     });
     _startSnakeMoving();
   }
