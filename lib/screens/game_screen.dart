@@ -3,9 +3,9 @@ import '../components/game_app_bar.dart';
 import '../components/game_canvas.dart';
 import '../components/local_storage_service.dart';
 import '../components/swipe_controller.dart';
-import '../components/swipe_controller.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:screenshot/screenshot.dart';
 
 class GameScreen extends StatefulWidget {
   final String mode;
@@ -18,6 +18,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   final GlobalKey<GameCanvasState> gameCanvasKey = GlobalKey<GameCanvasState>();
+  final ScreenshotController screenshotController = ScreenshotController();
 
   void _sendSwipeDirection(String direction) {
     SwipeDirectionNotification(direction).dispatch(context);
@@ -232,48 +233,52 @@ class _GameScreenState extends State<GameScreen> {
                           }
                           return true;
                         },
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Expanded(
-                              child: GameCanvas(
-                                key: gameCanvasKey,
-                                columns: gridSettings!['columns'] ?? 0,
-                                rows: gridSettings!['rows'] ?? 0,
-                                backgroundColor: gridSettings!['backgroundColor'],
-                                backgroundImage: gridSettings!['backgroundImage'] ?? false,
-                                gridItemOptions: gridSettings!['gridItemOptions'] is Map<String, dynamic>
-                                    ? gridSettings!['gridItemOptions'] as Map<String, dynamic>
-                                    : gridSettings!['gridItemOptions'] != null
-                                        ? Map<String, dynamic>.from(gridSettings!['gridItemOptions'])
-                                        : null,
-                                mode: widget.resume && _resumeMode != null ? _resumeMode! : widget.mode,
-                                onScoreChanged: (newScore) {
-                                  setState(() {
-                                    score = newScore;
-                                  });
-                                },
-                                onLivesChanged: (newLives) {
-                                  setState(() {
-                                    livesLeft = newLives;
-                                  });
-                                },
-                                onCoinsChanged: (newCoins) {
-                                  setState(() {
-                                    coins = newCoins;
-                                  });
-                                },
-                                currentLevel: currentLevel,
-                                onLevelChanged: _handleLevelChanged,
-                                isFinalStage: isFinalStage,
-                                resumeState: resumeState,
-                                objectDefinitions: objectDefinitions,
+                        child: Screenshot(
+                          controller: screenshotController,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Expanded(
+                                child: GameCanvas(
+                                  key: gameCanvasKey,
+                                  columns: gridSettings!['columns'] ?? 0,
+                                  rows: gridSettings!['rows'] ?? 0,
+                                  backgroundColor: gridSettings!['backgroundColor'],
+                                  backgroundImage: gridSettings!['backgroundImage'] ?? false,
+                                  gridItemOptions: gridSettings!['gridItemOptions'] is Map<String, dynamic>
+                                      ? gridSettings!['gridItemOptions'] as Map<String, dynamic>
+                                      : gridSettings!['gridItemOptions'] != null
+                                          ? Map<String, dynamic>.from(gridSettings!['gridItemOptions'])
+                                          : null,
+                                  mode: widget.resume && _resumeMode != null ? _resumeMode! : widget.mode,
+                                  onScoreChanged: (newScore) {
+                                    setState(() {
+                                      score = newScore;
+                                    });
+                                  },
+                                  onLivesChanged: (newLives) {
+                                    setState(() {
+                                      livesLeft = newLives;
+                                    });
+                                  },
+                                  onCoinsChanged: (newCoins) {
+                                    setState(() {
+                                      coins = newCoins;
+                                    });
+                                  },
+                                  currentLevel: currentLevel,
+                                  onLevelChanged: _handleLevelChanged,
+                                  isFinalStage: isFinalStage,
+                                  resumeState: resumeState,
+                                  objectDefinitions: objectDefinitions,
+                                  screenshotController: screenshotController, // pass down
+                                ),
                               ),
-                            ),
-                            Builder(
-                              builder: (notificationContext) => SwipeController(notificationContext: notificationContext),
-                            ),
-                          ],
+                              Builder(
+                                builder: (notificationContext) => SwipeController(notificationContext: notificationContext),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     )

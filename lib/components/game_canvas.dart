@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:snakey/components/count_down.dart';
 import 'package:snakey/components/button.dart';
 import '../components/local_storage_service.dart';
+import 'package:screenshot/screenshot.dart';
+import 'share_helper.dart';
 
 enum SnakeDirection { up, down, left, right }
 
@@ -29,8 +31,10 @@ class GameCanvas extends StatefulWidget {
   // Add objectDefinitions prop
   final List<dynamic>? objectDefinitions;
 
+  final ScreenshotController? screenshotController;
+
   const GameCanvas({
-    super.key,
+    Key? key,
     required this.columns,
     required this.rows,
     this.padding = 16.0,
@@ -46,7 +50,8 @@ class GameCanvas extends StatefulWidget {
     this.isFinalStage = false,
     this.resumeState,
     this.objectDefinitions,
-  });
+    this.screenshotController,
+  }) : super(key: key);
 
   @override
   State<GameCanvas> createState() => GameCanvasState();
@@ -1194,7 +1199,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'Level Complete!',
+                        'Complete!',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 28,
@@ -1202,9 +1207,10 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
                         ),
                       ),
                       const SizedBox(height: 24),
-                      Text('Points x $_lastPointsGained', style: const TextStyle(color: Colors.white, fontSize: 18)),
-                      Text('Coins x $_lastCoinsGained', style: const TextStyle(color: Colors.white, fontSize: 18)),
-                      Text('Lives x $_lastLivesGained', style: const TextStyle(color: Colors.white, fontSize: 18)),
+                      Text('Points x $_lastPointsGained', style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Coins x $_lastCoinsGained', style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Lives x $_lastLivesGained', style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Total Score x ${calculateTotalScore()}', style: const TextStyle(color: Colors.amber, fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 32),
                       if (widget.mode == "story") ...[
                         Button(
@@ -1232,6 +1238,22 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
                             });
                             _respawnSnake();
                           },
+                        ),
+                        const SizedBox(height: 16),
+                        Builder(
+                          builder: (context) => Button(
+                            label: 'Share with Friends',
+                            onPressed: () async {
+                              final controller = widget.screenshotController;
+                              if (controller != null) {
+                                await ShareHelper.shareCurrentScreen(context, controller);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Screenshot sharing not available.')),
+                                );
+                              }
+                            },
+                          ),
                         ),
                       ],
                     ],

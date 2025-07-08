@@ -87,13 +87,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     );
                   },
                 ),
-                Button(
+                /*Button(
                   label: 'Play Story',
                   icon: Icons.play_arrow,
                   type: ButtonType.outlined,
                   onPressed: () => _navigateToGame(context, 'story'),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 20),*/
                 Button(
                   label: 'Endless Snake',
                   icon: Icons.play_arrow,
