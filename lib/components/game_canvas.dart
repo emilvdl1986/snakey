@@ -181,8 +181,8 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
       coins = state['coins'] ?? 0;
       snakeDirection = _snakeDirectionFromString(state['snakeDirection'] ?? 'right');
       _snakeSpeed = state['snakeSpeed'] ?? 8;
-      // Restore endless level if present
-      if ((_resumeMode ?? widget.mode) == 'endless' && state['endlessLevel'] != null) {
+      // Restore endless level if present (do not increment on resume)
+      if ((state['gameMode'] ?? widget.mode) == 'endless' && state['endlessLevel'] != null) {
         endlessLevel = state['endlessLevel'] is int ? state['endlessLevel'] : int.tryParse(state['endlessLevel'].toString()) ?? 1;
       }
       // Restore snake positions
@@ -216,6 +216,10 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
       // Set random initial direction
       final directions = SnakeDirection.values;
       snakeDirection = directions[Random().nextInt(directions.length)];
+      // For endless mode, reset endlessLevel to 1 on new game
+      if ((widget.mode == 'endless') && (widget.resumeState == null)) {
+        endlessLevel = 1;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final settings = widget.gridItemOptions?['snakeSettings'] ?? (widget.gridItemOptions?['snakeSettings'] ?? {});
         if (settings != null && settings['speed'] != null) {
@@ -1246,6 +1250,14 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
                               _isLevelComplete = false;
                               _showCountdown = true;
                             });
+                            // Only increment endlessLevel and update app bar when actually continuing to next endless level
+                            if (widget.mode == 'endless') {
+                              endlessLevel += 1;
+                              if (widget.onLevelChanged != null) {
+                                widget.onLevelChanged!(endlessLevel);
+                              }
+                              _saveGameStateToLocalStorage();
+                            }
                             _respawnSnake();
                           },
                         ),
@@ -1295,7 +1307,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
     });
     // Always reload objects after respawn, even after resume
     _loadObjects();
-    _onLevelStart();
+    // Do not increment endlessLevel or call _onLevelStart here!
     // Do not reset score or livesLeft
     if (widget.onScoreChanged != null) {
       widget.onScoreChanged!(score);
@@ -1333,7 +1345,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
     });
     // Always reload objects after reset, even after resume
     _loadObjects();
-    _onLevelStart();
+    // Do not increment endlessLevel or call _onLevelStart here!
     if (widget.onScoreChanged != null) widget.onScoreChanged!(score);
     if (widget.onLivesChanged != null) widget.onLivesChanged!(livesLeft);
     if (widget.onCoinsChanged != null) widget.onCoinsChanged!(coins);
@@ -1349,11 +1361,21 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
 
   // Call this after respawn/reset/next level
   void _onLevelStart() {
+    // Only update endlessLevel from resumeState if resuming
     if (widget.mode == 'endless') {
-      endlessLevel += 1;
-      _saveGameStateToLocalStorage();
-      if (widget.onLevelChanged != null) {
-        widget.onLevelChanged!(endlessLevel);
+      if (widget.resumeState != null) {
+        final dynamic stateRaw = widget.resumeState;
+        final Map<String, dynamic> state = stateRaw is Map<String, dynamic>
+            ? stateRaw
+            : Map<String, dynamic>.from(stateRaw);
+        if (state['endlessLevel'] != null) {
+          endlessLevel = state['endlessLevel'] is int ? state['endlessLevel'] : int.tryParse(state['endlessLevel'].toString()) ?? endlessLevel;
+        }
+        // Always update the app bar after restore
+        if (widget.onLevelChanged != null) {
+          widget.onLevelChanged!(endlessLevel);
+        }
+        _saveGameStateToLocalStorage();
       }
     }
     _startLevelTracking();

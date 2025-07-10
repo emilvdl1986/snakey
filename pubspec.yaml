@@ -77,6 +77,8 @@ flutter:
      - assets/objects/heart.png
      - assets/objects/coin.png
      - assets/objects/key.png
+     - assets/objects/fire.gif
+     - assets/objects/rat.gif
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

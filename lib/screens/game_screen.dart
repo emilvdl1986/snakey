@@ -108,7 +108,11 @@ class _GameScreenState extends State<GameScreen> {
         score = savedGame['score'] ?? 0;
         livesLeft = savedGame['lives'] ?? 3;
         coins = savedGame['coins'] ?? 0;
-        currentLevel = savedGame['level'] ?? 1;
+        if (savedMode == 'endless') {
+          currentLevel = savedGame['endlessLevel'] ?? 1;
+        } else {
+          currentLevel = savedGame['level'] ?? 1;
+        }
         isLoading = false;
         isFinalStage = isFinalStage; // will be true if final stage, else false
         // Set data and storyData for app bar
