@@ -165,40 +165,15 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  void _handleLevelChanged(int newLevel) async {
-    if (widget.mode == 'story') {
-      // Check if the next stage file exists before updating level
-      setState(() {
-        isLoading = true;
-      });
-      try {
-        final String stagePath = 'assets/stages/$newLevel.json';
-        // Try to load the file, if it fails, do not update level
-        final String stageJson = await rootBundle.loadString(stagePath);
-        final Map<String, dynamic> loadedStage = json.decode(stageJson);
-        bool finalStage = false;
-        if (loadedStage['gridSettings'] != null && loadedStage['gridSettings']['end'] == true) {
-          finalStage = true;
-        }
-        setState(() {
-          currentLevel = newLevel;
-          gridSettings = loadedStage['gridSettings'] as Map<String, dynamic>?;
-          isLoading = false;
-          isFinalStage = finalStage;
-          error = null;
-        });
-      } catch (e) {
-        // If file does not exist, do not update currentLevel, show a message or end the game
-        setState(() {
-          error = 'No more levels! You have completed all available stages.';
-          isLoading = false;
-        });
-      }
-    } else {
-      setState(() {
+  void _handleLevelChanged(int newLevel) {
+    setState(() {
+      if ((widget.mode == 'endless' || _resumeMode == 'endless') && gameCanvasKey.currentState != null) {
+        // For endless mode, sync endlessLevel from GameCanvasState
+        currentLevel = gameCanvasKey.currentState!.endlessLevel;
+      } else {
         currentLevel = newLevel;
-      });
-    }
+      }
+    });
   }
 
   @override

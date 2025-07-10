@@ -58,6 +58,9 @@ class GameCanvas extends StatefulWidget {
 }
 
 class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMixin {
+  // Endless mode level tracking
+  int endlessLevel = 1;
+
   // Queue for direction changes
   final List<SnakeDirection> _directionQueue = [];
 
@@ -178,6 +181,10 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
       coins = state['coins'] ?? 0;
       snakeDirection = _snakeDirectionFromString(state['snakeDirection'] ?? 'right');
       _snakeSpeed = state['snakeSpeed'] ?? 8;
+      // Restore endless level if present
+      if ((_resumeMode ?? widget.mode) == 'endless' && state['endlessLevel'] != null) {
+        endlessLevel = state['endlessLevel'] is int ? state['endlessLevel'] : int.tryParse(state['endlessLevel'].toString()) ?? 1;
+      }
       // Restore snake positions
       if (state['snakePositions'] != null) {
         snakePositions = List<Map<String, int>>.from(
@@ -1206,8 +1213,11 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      Text('Points x $_lastPointsGained', style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      if (widget.mode == 'endless')
+                        Text('Level $endlessLevel', style: const TextStyle(color: Colors.cyanAccent, fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      Text('Points x [38;5;214m$_lastPointsGained[0m', style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
                       Text('Coins x $_lastCoinsGained', style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
                       Text('Lives x $_lastLivesGained', style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
                       Text('Total Score x ${calculateTotalScore()}', style: const TextStyle(color: Colors.amber, fontSize: 20, fontWeight: FontWeight.bold)),
@@ -1339,6 +1349,13 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
 
   // Call this after respawn/reset/next level
   void _onLevelStart() {
+    if (widget.mode == 'endless') {
+      endlessLevel += 1;
+      _saveGameStateToLocalStorage();
+      if (widget.onLevelChanged != null) {
+        widget.onLevelChanged!(endlessLevel);
+      }
+    }
     _startLevelTracking();
   }
 
@@ -1602,6 +1619,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
       'gameMode': modeToSave,
       'score': score,
       'level': modeToSave == 'story' ? widget.currentLevel : null,
+      'endlessLevel': modeToSave == 'endless' ? endlessLevel : null,
       'coins': coins,
       'lives': livesLeft,
       'snakePositions': List<Map<String, int>>.from(snakePositions),
@@ -1917,7 +1935,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
                                           Container(
                                             width: size * 0.18,
                                             height: size * 0.18,
-                                            margin: EdgeInsets.only(top: size * 0.05),
+                                            margin: EdgeInsets.only(top: size *  0.05),
                                             decoration: const BoxDecoration(
                                               color: Colors.black,
                                               shape: BoxShape.circle,
