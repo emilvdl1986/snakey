@@ -7,8 +7,8 @@
         "showLevel":true
     },
     "gridSettings":{
-        "columns":10,
-        "rows":12,
+        "columns":8,
+        "rows":10,
         "backgroundColor":"transparent",
         "backgroundImage":false,
         "gridItemOptions":{
