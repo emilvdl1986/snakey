@@ -57,7 +57,8 @@ class GameCanvas extends StatefulWidget {
   State<GameCanvas> createState() => GameCanvasState();
 }
 
-class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMixin {
+class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
+  // Removed _pendingControllerCreation. Only ever one controller at a time.
   // Endless mode level tracking
   int endlessLevel = 1;
 
@@ -133,6 +134,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
 
   AnimationController? _moveController;
   Animation<double>? _moveAnimation;
+  bool _isDisposingController = false;
   Offset? _oldHeadOffset;
   Offset? _newHeadOffset;
   bool _isAnimating = false;
@@ -263,10 +265,29 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
   }
 
   void _setupAnimationController() {
-    // Clamp speed to avoid division by zero or too fast/slow
+    debugPrint('[DEBUG] _setupAnimationController: ENTER');
+    // Always dispose the old controller synchronously before creating a new one
+    if (_moveController != null) {
+      try {
+        debugPrint('[DEBUG] Disposing previous AnimationController...');
+        _moveController!.dispose();
+      } catch (e) {
+        debugPrint('[DEBUG] Exception during AnimationController dispose: $e');
+      }
+      _moveController = null;
+      _moveAnimation = null;
+    }
+    // Now create the new controller synchronously
+    _createAnimationController();
+    debugPrint('[DEBUG] _setupAnimationController: EXIT');
+  }
+
+  void _createAnimationController() {
     final int speed = _snakeSpeed.clamp(1, 20);
-    final int durationMs = (400 / speed * 5).clamp(60, 1000).toInt(); // Higher speed = shorter duration
-    _moveController?.dispose();
+    final int durationMs = (400 / speed * 5).clamp(60, 1000).toInt();
+    if (widget.mode == 'endless') {
+      debugPrint('[DEBUG] Snake speed (endless): $_snakeSpeed | Level: $endlessLevel');
+    }
     _moveController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: durationMs),
@@ -285,7 +306,6 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
       if (status == AnimationStatus.completed) {
         _isAnimating = false;
         _moveController!.reset();
-        // Insert new head
         if (_pendingNewHead != null) {
           snakePositions.insert(0, _pendingNewHead!);
           snakePositions.removeLast();
@@ -880,6 +900,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
   // Moves the snake one step in the current direction
   void _snakeMoving() {
     if (_isGameOver || _isLevelComplete || _isAnimating || snakePositions.isEmpty) return;
+    if (!mounted || _moveController == null) return;
     // Use next direction from queue if available
     if (_directionQueue.isNotEmpty) {
       snakeDirection = _directionQueue.removeAt(0);
@@ -989,6 +1010,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
 
   void _startSnakeMoving() {
     // Only trigger the first move after countdown, then let animation drive the loop
+    if (!mounted || _moveController == null) return;
     _snakeMoving();
   }
 
@@ -1257,6 +1279,7 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
                                 widget.onLevelChanged!(endlessLevel);
                               }
                               _saveGameStateToLocalStorage();
+                              _onLevelStart(); // Ensure speed and debug log update
                             }
                             _respawnSnake();
                           },
@@ -1376,6 +1399,24 @@ class GameCanvasState extends State<GameCanvas> with SingleTickerProviderStateMi
           widget.onLevelChanged!(endlessLevel);
         }
         _saveGameStateToLocalStorage();
+      }
+      // --- SPEED INCREASE LOGIC FOR ENDLESS MODE ---
+      // On every endless level start, set speed to base + (endlessLevel - 1)
+      // Only if not restoring from resumeState (i.e., on actual level up)
+      if (widget.resumeState == null) {
+        // Use the initial speed from gridItemOptions or fallback to 8
+        int baseSpeed = 8;
+        final settings = widget.gridItemOptions?['snakeSettings'] ?? (widget.gridItemOptions?['snakeSettings'] ?? {});
+        if (settings != null && settings['speed'] != null) {
+          baseSpeed = settings['speed'];
+        } else if (widget.gridItemOptions?['speed'] != null) {
+          baseSpeed = widget.gridItemOptions!['speed'];
+        }
+        _snakeSpeed = baseSpeed + (endlessLevel - 1);
+        debugPrint('[DEBUG] (before controller) Snake speed (endless): $_snakeSpeed | Level: $endlessLevel');
+        _setupAnimationController();
+        // Print debug again after controller is set up (in case speed is changed by controller logic)
+        debugPrint('[DEBUG] (after controller) Snake speed (endless): $_snakeSpeed | Level: $endlessLevel');
       }
     }
     _startLevelTracking();
