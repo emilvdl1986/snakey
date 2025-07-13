@@ -25,20 +25,21 @@ class GameAdsManager {
   }) {
     // Use the test ad unit ID if none is provided
     final String testAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
-    //final String unitId = adUnitId ?? testAdUnitId;
+    debugPrint('Calling RewardedAd.load with adUnitId: $testAdUnitId');
     RewardedAd.load(
       adUnitId: testAdUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
+          debugPrint('RewardedAd loaded successfully');
           _rewardedAd = ad;
           _isRewardedAdLoaded = true;
           onLoaded?.call();
         },
         onAdFailedToLoad: (error) {
+          debugPrint('Ad failed to load:\nCode: ${error.code}\nMessage: ${error.message}');
           _rewardedAd = null;
           _isRewardedAdLoaded = false;
-          debugPrint('Ad failed to load:\nCode: ${error.code}\nMessage: ${error.message}');
           onFailed?.call(error);
         },
       ),

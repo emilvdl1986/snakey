@@ -125,6 +125,12 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    // Initialize AdMob and load a rewarded ad at startup
+    GameAdsManager().initialize();
+    GameAdsManager().loadRewardedAd(
+      onLoaded: () => debugPrint('RewardedAd loaded and ready!'),
+      onFailed: (error) => debugPrint('Initial ad failed to load: \\nCode: \\${error.code} \\nMessage: \\${error.message}'),
+    );
     // If objectDefinitions are provided (from resume), use them immediately
     if (widget.objectDefinitions != null) {
       objects = widget.objectDefinitions;
@@ -1048,11 +1054,19 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
           });
           _respawnSnake();
         },
-        onClosed: () {},
+        onClosed: () {
+          // Always load a new ad after the previous one is closed
+          GameAdsManager().loadRewardedAd(
+            onLoaded: () => debugPrint('RewardedAd loaded and ready!'),
+            onFailed: (error) => debugPrint('Ad failed to load: \\nCode: \\${error.code} \\nMessage: \\${error.message}'),
+          );
+        },
         onFailed: () {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Ad failed to load. Please try again.')),
           );
+          // Try to load a new ad after failure as well
+          GameAdsManager().loadRewardedAd();
         },
       );
     }
