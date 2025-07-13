@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/game_app_bar.dart';
 import '../components/game_canvas.dart';
+import '../components/game_canvas_swipe_extension.dart';
 import '../components/local_storage_service.dart';
 import '../components/swipe_controller.dart';
 import 'dart:convert';
@@ -222,6 +223,7 @@ class _GameScreenState extends State<GameScreen> {
                                   key: gameCanvasKey,
                                   columns: gridSettings!['columns'] ?? 0,
                                   rows: gridSettings!['rows'] ?? 0,
+                                  padding: gridSettings!['padding']?.toDouble() ?? 8.0,
                                   backgroundColor: gridSettings!['backgroundColor'],
                                   backgroundImage: gridSettings!['backgroundImage'] ?? false,
                                   gridItemOptions: gridSettings!['gridItemOptions'] is Map<String, dynamic>

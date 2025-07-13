@@ -9,6 +9,8 @@ import '../components/local_storage_service.dart';
 import 'package:screenshot/screenshot.dart';
 import 'share_helper.dart';
 
+import 'game_popup_manager.dart';
+
 enum SnakeDirection { up, down, left, right }
 
 class GameCanvas extends StatefulWidget {
@@ -25,30 +27,26 @@ class GameCanvas extends StatefulWidget {
   final int currentLevel;
   final ValueChanged<int>? onLevelChanged;
   final bool isFinalStage;
-
   final Map<String, dynamic>? resumeState;
+  final dynamic objectDefinitions;
+  final dynamic screenshotController;
 
-  // Add objectDefinitions prop
-  final List<dynamic>? objectDefinitions;
-
-  final ScreenshotController? screenshotController;
-
-  const GameCanvas({
+  GameCanvas({
     Key? key,
     required this.columns,
     required this.rows,
-    this.padding = 16.0,
-    this.backgroundColor,
-    this.backgroundImage = false,
-    this.gridItemOptions,
+    required this.padding,
+    required this.backgroundColor,
+    required this.backgroundImage,
+    required this.gridItemOptions,
     required this.mode,
-    this.onScoreChanged,
-    this.onLivesChanged,
-    this.onCoinsChanged,
+    required this.onScoreChanged,
+    required this.onLivesChanged,
+    required this.onCoinsChanged,
     required this.currentLevel,
-    this.onLevelChanged,
-    this.isFinalStage = false,
-    this.resumeState,
+    required this.onLevelChanged,
+    required this.isFinalStage,
+    required this.resumeState,
     this.objectDefinitions,
     this.screenshotController,
   }) : super(key: key);
@@ -58,62 +56,15 @@ class GameCanvas extends StatefulWidget {
 }
 
 class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
-  // Removed _pendingControllerCreation. Only ever one controller at a time.
-  // Endless mode level tracking
+  // Public getters for extension access
+  bool get isGameOver => _isGameOver;
+  bool get isLevelComplete => _isLevelComplete;
+  List<SnakeDirection> get directionQueue => _directionQueue;
+
   int endlessLevel = 1;
-
-  // Queue for direction changes
-  final List<SnakeDirection> _directionQueue = [];
-
-  // Allow external swipe direction control
-  void setDirectionFromSwipe(String direction) {
-    debugPrint('setDirectionFromSwipe called with: ' + direction);
-    if (_isGameOver || _isLevelComplete) return;
-    SnakeDirection? newDirection;
-    switch (direction) {
-      case 'up':
-        newDirection = SnakeDirection.up;
-        break;
-      case 'down':
-        newDirection = SnakeDirection.down;
-        break;
-      case 'left':
-        newDirection = SnakeDirection.left;
-        break;
-      case 'right':
-        newDirection = SnakeDirection.right;
-        break;
-    }
-    if (newDirection != null) {
-      // Prevent reversing direction (relative to last in queue or current direction)
-      SnakeDirection lastDirection = _directionQueue.isNotEmpty ? _directionQueue.last : snakeDirection;
-      if ((lastDirection == SnakeDirection.up && newDirection == SnakeDirection.down) ||
-          (lastDirection == SnakeDirection.down && newDirection == SnakeDirection.up) ||
-          (lastDirection == SnakeDirection.left && newDirection == SnakeDirection.right) ||
-          (lastDirection == SnakeDirection.right && newDirection == SnakeDirection.left)) {
-        return;
-      }
-      // Only add if not already the last queued direction
-      if (_directionQueue.isEmpty || _directionQueue.last != newDirection) {
-        _directionQueue.add(newDirection);
-      }
-      // Give focus to the RawKeyboardListener so keyboard and swipe can both work
-      if (!_focusNode.hasFocus) {
-        _focusNode.requestFocus();
-      }
-    }
-  }
   String? _resumeMode;
-  // Ensures that if all keys are collected and no exit exists, exits are generated
-  void _ensureExitIfKeysCollected() {
-    if (keyItems.isEmpty && exitItems.isEmpty && objects != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && keyItems.isEmpty && exitItems.isEmpty && objects != null) {
-          _generateRandomExitItems();
-        }
-      });
-    }
-  }
+  List<SnakeDirection> _directionQueue = [];
+
   List<dynamic>? objects;
   bool isLoadingObjects = true;
   List<Map<String, dynamic>> foodItems = [];
@@ -158,6 +109,17 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
   int _startScore = 0;
   int _startCoins = 0;
   int _startLives = 0;
+
+  // Helper to ensure exit is generated if all keys are collected
+  void _ensureExitIfKeysCollected() {
+    if (keyItems.isEmpty && exitItems.isEmpty && objects != null) {
+      _generateRandomExitItems();
+    }
+  }
+
+  // ...all other methods and logic that were outside the class...
+
+  // (The rest of your methods and logic remain unchanged and inside the class)
 
   @override
   void initState() {
@@ -1045,93 +1007,32 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
     _isAnimating = false;
     _pendingMoves = 0;
     _nextDirection = null;
-    showDialog(
+    // Use GamePopupManager for popup
+    GamePopupManager.showGameOver(
       context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.7),
-      builder: (context) => Stack(
-        children: [
-          Positioned.fill(
-            child: Container(
-              color: Colors.transparent,
-              child: Center(
-                child: Container(
-                  width: 340,
-                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'Game Over',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Your score: $score',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Lives left: $livesLeft',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (livesLeft > 0)
-                        Button(
-                          label: 'Respawn',
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            _respawnSnake();
-                          },
-                        ),
-                      if (livesLeft > 0) const SizedBox(height: 12),
-                      if (livesLeft == 0 && coins >= 3)
-                        Button(
-                          label: 'Respawn (use 3 coins)',
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            setState(() {
-                              coins -= 3;
-                            });
-                            if (widget.onCoinsChanged != null) {
-                              widget.onCoinsChanged!(coins);
-                            }
-                            _respawnSnake();
-                          },
-                          color: Colors.amber,
-                        ),
-                      if (livesLeft == 0 && coins >= 3) const SizedBox(height: 12),
-                      Button(
-                        label: 'Reset',
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          _updateTopScores(score); // Update top scores on reset
-                          _resetGame();
-                        },
-                        color: Colors.red,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      score: score,
+      livesLeft: livesLeft,
+      coins: coins,
+      onRespawn: _respawnSnake,
+      onReset: () {
+        _updateTopScores(score);
+        endlessLevel = 1;
+        if (widget.onLevelChanged != null) {
+          widget.onLevelChanged!(1);
+        }
+        _resetGame();
+      },
+      onRespawnWithCoins: (livesLeft == 0 && coins >= 3)
+          ? () {
+              setState(() {
+                coins -= 3;
+              });
+              if (widget.onCoinsChanged != null) {
+                widget.onCoinsChanged!(coins);
+              }
+              _respawnSnake();
+            }
+          : null,
     );
   }
 
@@ -1355,7 +1256,6 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
       foodItems.clear();
       dangerItems.clear();
       exitItems.clear();
-      snakePositions.clear();
       heartItems.clear();
       coinItems.clear();
       keyItems.clear();
@@ -1365,6 +1265,8 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
       _pendingMoves = 0;
       _nextDirection = null;
       _isAnimating = false;
+      // Only reset endlessLevel to 1 if needed (handled in onReset callback)
+      // Do not touch snake direction or positions here; let existing logic handle it
     });
     // Always reload objects after reset, even after resume
     _loadObjects();
