@@ -95,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 ),
                 const SizedBox(height: 20),*/
                 Button(
-                  label: 'Endless Snake',
+                  label: 'Play',
                   icon: Icons.play_arrow,
                   type: ButtonType.outlined,
                   onPressed: () => _navigateToGame(context, 'endless'),

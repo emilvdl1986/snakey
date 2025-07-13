@@ -4,10 +4,10 @@
         "showScore":true,
         "showLives":true,
         "showCoins":true,
-        "showLevel":false
+        "showLevel":true
     },
     "gridSettings":{
-        "columns":10,
+        "columns":8,
         "rows":10,
         "backgroundColor":"transparent",
         "backgroundImage":false,

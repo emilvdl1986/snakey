@@ -1,13 +1,13 @@
 [
     {
         "type":"food",
-        "image":"assets/objects/burger.png",
+        "image":"assets/objects/rat.gif",
         "action":"grow",
          "growLength":1,
           "points":10
     }, {
         "type":"danger",
-        "image":"assets/objects/fire.png",
+        "image":"assets/objects/fire.gif",
         "action":"shrink",
         "shrinkLength":1,
         "points":-10
