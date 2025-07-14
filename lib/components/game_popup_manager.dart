@@ -1,9 +1,11 @@
+
 import 'package:flutter/material.dart';
+import 'game_ads.dart';
 
 /// Handles all popups and modals for the game canvas.
 /// Usage: Place this widget above your GameCanvas and call showGamePopup(context, ...) as needed.
 class GamePopupManager {
-  static Future<void> showGameOver({
+  static Future<dynamic> showGameOver({
     required BuildContext context,
     required int score,
     required int livesLeft,
@@ -12,7 +14,7 @@ class GamePopupManager {
     required VoidCallback onReset,
     VoidCallback? onRespawnWithCoins,
   }) async {
-    await showDialog(
+    return await showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.7),
@@ -76,6 +78,15 @@ class GamePopupManager {
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
                         ),
                       if (livesLeft == 0 && coins >= 3) const SizedBox(height: 12),
+                      if (livesLeft == 0 && (coins < 3 || onRespawnWithCoins == null))
+                        ElevatedButton(
+                          onPressed: () {
+                            // Show rewarded ad logic should be handled by parent via callback or state
+                            Navigator.of(context).pop('watchAd');
+                          },
+                          child: const Text('Watch Ad to Continue'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                        ),
                       ElevatedButton(
                         onPressed: () {
                           Navigator.of(context).pop();

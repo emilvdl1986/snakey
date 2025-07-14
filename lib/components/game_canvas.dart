@@ -10,6 +10,7 @@ import 'package:screenshot/screenshot.dart';
 import 'share_helper.dart';
 
 import 'game_popup_manager.dart';
+import 'game_ads.dart';
 
 enum SnakeDirection { up, down, left, right }
 
@@ -124,6 +125,12 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    // Initialize AdMob and load a rewarded ad at startup
+    GameAdsManager().initialize();
+    GameAdsManager().loadRewardedAd(
+      onLoaded: () => debugPrint('RewardedAd loaded and ready!'),
+      onFailed: (error) => debugPrint('Initial ad failed to load: \\nCode: \\${error.code} \\nMessage: \\${error.message}'),
+    );
     // If objectDefinitions are provided (from resume), use them immediately
     if (widget.objectDefinitions != null) {
       objects = widget.objectDefinitions;
@@ -996,7 +1003,7 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
     await LocalStorageService.setString('top_scores', scores.join(','));
   }
 
-  void gameOver() {
+  Future<void> gameOver() async {
     _isGameOver = true;
     livesLeft = (livesLeft > 0) ? livesLeft - 1 : 0;
     if (widget.onLivesChanged != null) {
@@ -1007,8 +1014,12 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
     _isAnimating = false;
     _pendingMoves = 0;
     _nextDirection = null;
-    // Use GamePopupManager for popup
-    GamePopupManager.showGameOver(
+    // Use GamePopupManager for popup and handle result
+    await _showGameOverDialog();
+  }
+
+  Future<void> _showGameOverDialog() async {
+    final result = await GamePopupManager.showGameOver(
       context: context,
       score: score,
       livesLeft: livesLeft,
@@ -1034,6 +1045,31 @@ class GameCanvasState extends State<GameCanvas> with TickerProviderStateMixin {
             }
           : null,
     );
+    if (result == 'watchAd') {
+      GameAdsManager().showRewardedAd(
+        onRewarded: () {
+          setState(() {
+            livesLeft = 1;
+            _isGameOver = false;
+          });
+          _respawnSnake();
+        },
+        onClosed: () {
+          // Always load a new ad after the previous one is closed
+          GameAdsManager().loadRewardedAd(
+            onLoaded: () => debugPrint('RewardedAd loaded and ready!'),
+            onFailed: (error) => debugPrint('Ad failed to load: \\nCode: \\${error.code} \\nMessage: \\${error.message}'),
+          );
+        },
+        onFailed: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ad failed to load. Please try again.')),
+          );
+          // Try to load a new ad after failure as well
+          GameAdsManager().loadRewardedAd();
+        },
+      );
+    }
   }
 
   void gameNext({int? pointsGained, int? coinsGained, int? livesGained}) {
